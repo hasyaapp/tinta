@@ -35,6 +35,7 @@ import { IconButton } from "./components/UI";
 import DrawingCanvas from "./components/DrawingCanvas";
 import PageCrumple from "./components/PageCrumple";
 import JournalTransition, { COVER_DURATION } from "./components/JournalBook";
+import PageTurnLayer from "./components/PageTurnLayer";
 import JournalCustomizer from "./components/JournalCustomizer";
 import SettingsDialog from "./components/dialogs/SettingsDialog";
 import SearchDialog from "./components/dialogs/SearchDialog";
@@ -886,6 +887,7 @@ export default function App() {
           templates={lib.templates}
         />
       )}
+      <PageTurnLayer />
     </main>
   );
 }

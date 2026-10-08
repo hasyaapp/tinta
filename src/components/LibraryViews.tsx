@@ -10,8 +10,8 @@ import {
   CoverBoard,
   FoldedSpread,
   TurningPage,
-  PAGE_TURN_DURATION,
 } from "./JournalBook";
+import { bookMotion } from "../engine/book/motion";
 export function Home({
   library,
   shelfState,
@@ -239,6 +239,7 @@ export function Pages({
     from: string;
     to: string;
     serial: number;
+    back: boolean;
   } | null>(null);
   useEffect(() => {
     const from = previousId.current,
@@ -257,14 +258,23 @@ export function Pages({
       setTurn(null);
       return;
     }
-    setTurn({
-      dir: index > before ? 1 : -1,
-      from,
-      to,
-      serial: performance.now(),
+    setTurn((current) => {
+      // A WebGL turn is progress-driven, so stepping back onto the same sheet
+      // reverses it in flight instead of restarting a new one.
+      if (current && bookMotion.ready) {
+        if (current.from === from && current.to === to)
+          return { ...current, back: false };
+        if (current.from === to && current.to === from)
+          return { ...current, back: true };
+      }
+      return {
+        dir: index > before ? 1 : -1,
+        from,
+        to,
+        serial: performance.now(),
+        back: false,
+      };
     });
-    const timer = setTimeout(() => setTurn(null), PAGE_TURN_DURATION);
-    return () => clearTimeout(timer);
   }, [index, journal.pageIds, grid]);
   return (
     <section
@@ -439,6 +449,8 @@ export function Pages({
               to={library.pages[turn.to]}
               direction={turn.dir}
               templates={library.templates}
+              back={turn.back}
+              onDone={() => setTurn(null)}
             />
           )}
           {!page && (

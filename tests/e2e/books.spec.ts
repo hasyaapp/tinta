@@ -113,11 +113,15 @@ test("two-sided page flip keeps left/right artwork intact in both directions and
   expect(pixels[1][0]).toBeLessThan(30);
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".page-turn-scene")).toBeVisible();
+  // The sheet itself is painted by the shared WebGL layer, which must activate
+  // for the turn and deactivate once it lands.
+  await expect(page.locator(".motion-canvas[data-active]")).toBeVisible();
   // The sheet covers the outgoing left page as it lands, so that page has to stay
   // put for the whole turn instead of being swapped out at the half-way point.
   await page.waitForTimeout(650);
   await expect(page.locator(".turn-stationary")).toBeVisible();
   await expect(page.locator(".page-turn-scene")).toHaveCount(0);
+  await expect(page.locator(".motion-canvas[data-active]")).toHaveCount(0);
   pixels = await leafPixels(page);
   expect(pixels[0][1]).toBeGreaterThan(190);
   expect(pixels[0][0]).toBeLessThan(30);
@@ -156,6 +160,8 @@ test("reduced motion opens without animation and the book remains usable after p
   ).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".page-turn-scene")).toHaveCount(0);
+  // Reduced motion skips the WebGL layer entirely.
+  await expect(page.locator(".motion-canvas[data-active]")).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   const book = await page.locator(".spread-page.current").boundingBox();
   expect(book!.width).toBeLessThan(390);
@@ -238,6 +244,7 @@ test("painted shelf follows journal selection, customization, resize and opening
   await button(page, "Open Welcome").click();
   // Opening has one moving cover; the shelf must not leave a second cover behind.
   await expect(page.locator(".cover-flip")).toBeVisible();
+  await expect(page.locator(".motion-canvas[data-active]")).toBeVisible();
   await expect
     .poll(() =>
       page
@@ -251,6 +258,7 @@ test("painted shelf follows journal selection, customization, resize and opening
     )
     .toBe(false);
   await expect(page.locator(".cover-flip")).toHaveCount(0);
+  await expect(page.locator(".motion-canvas[data-active]")).toHaveCount(0);
 });
 
 test("losing the shelf graphics context restores visible CSS books and navigation", async ({
