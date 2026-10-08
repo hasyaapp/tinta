@@ -17,10 +17,13 @@ const DEG = Math.PI / 180;
 /** Resting leaf tilt and total travel of the turning sheet (±14° → ∓166°). */
 const TURN_REST = -14 * DEG;
 const TURN_TRAVEL = -152 * DEG;
-/** Peak bow of the paper mid-turn; zero at both ends so the sheet lands flat. */
-const TURN_BEND = 46 * DEG;
-/** A hardcover board flexes far less than a page. */
-const COVER_BEND = 10 * DEG;
+/** Pages are stiff cardstock: a slight flex mid-turn, zero at both ends so the
+ *  card lands flat. A thin-paper curl here would contradict the board fan. */
+const TURN_BEND = 9 * DEG;
+/** A hardcover board barely flexes. */
+const COVER_BEND = 4 * DEG;
+/** Cardstock corner radius; must match --leaf-radius in book.css. */
+const LEAF_RADIUS = 18;
 /** The book-unfold keyframes put their waypoint at 42%. */
 const COVER_WAYPOINT = 0.42;
 
@@ -181,7 +184,7 @@ class Sheet {
       uFrontU: { value: new THREE.Vector2(0, 1) },
       uBackU: { value: new THREE.Vector2(0, 1) },
       uFaceSign: { value: -1 },
-      uRadius: { value: 30 },
+      uRadius: { value: LEAF_RADIUS },
       uFold: { value: 0 },
     };
     this.material = new THREE.ShaderMaterial({
@@ -330,7 +333,7 @@ export class BookMotionEngine {
     const sheet = this.turnSheet;
     sheet.u.uMirror.value = mirror;
     sheet.u.uFaceSign.value = -mirror;
-    sheet.u.uRadius.value = 30;
+    sheet.u.uRadius.value = LEAF_RADIUS;
     sheet.u.uBandWidth.value = 0;
     (sheet.u.uPaper.value as THREE.Color).set("#f8f7f2");
     // Forward shows the right half of the outgoing page and lands on the left
@@ -419,7 +422,7 @@ export class BookMotionEngine {
     const back = this.coverBack;
     back.u.uMirror.value = 1;
     back.u.uFaceSign.value = -1;
-    back.u.uRadius.value = 30;
+    back.u.uRadius.value = LEAF_RADIUS;
     back.u.uBandWidth.value = 0;
     (back.u.uPaper.value as THREE.Color).set("#efedea");
     (back.u.uFrontU.value as THREE.Vector2).set(0.5, 1);
@@ -429,7 +432,7 @@ export class BookMotionEngine {
     const block = this.coverBlock;
     block.u.uMirror.value = 1;
     block.u.uFaceSign.value = -1;
-    block.u.uRadius.value = 30;
+    block.u.uRadius.value = LEAF_RADIUS;
     block.u.uBandWidth.value = 0;
     (block.u.uPaper.value as THREE.Color).setStyle(
       request.band,

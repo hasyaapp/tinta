@@ -10,6 +10,8 @@
   --leaf-perspective: calc(var(--spread-width) * 1.54286);
   --book-center: 51.25%;
   --book-radius: calc(var(--closed-width) * 0.08);
+  /* Cardstock corners; must match LEAF_RADIUS in engine/book/PageTurn.ts. */
+  --leaf-radius: 18px;
 }
 .paper-app:after {
   opacity: 0;
@@ -254,21 +256,36 @@
 .spread-leaf {
   overflow: hidden;
   background: #efedea;
-  box-shadow: 0 0 1px #8885;
+}
+/* Pages are stiff cardstock, not paper: every card shows a laminated edge
+   below and along its outer side, so the fan reads as a deck of boards. */
+.spread-leaf.leaf-left {
+  box-shadow:
+    -1px 1px 0 #e6e2d9,
+    -2px 3px 0 #d4cdc0,
+    -3px 5px 0 #b4ac9d,
+    -3px 7px 6px #0b123038;
+}
+.spread-leaf.leaf-right {
+  box-shadow:
+    1px 1px 0 #e6e2d9,
+    2px 3px 0 #d4cdc0,
+    3px 5px 0 #b4ac9d,
+    3px 7px 6px #0b123038;
 }
 .leaf-left,
 .binding-left {
   left: 0;
   transform-origin: 100% 50%;
   transform: rotateY(14deg);
-  border-radius: 30px 0 0 30px;
+  border-radius: var(--leaf-radius) 0 0 var(--leaf-radius);
 }
 .leaf-right,
 .binding-right {
   right: 0;
   transform-origin: 0 50%;
   transform: rotateY(-14deg);
-  border-radius: 0 30px 30px 0;
+  border-radius: 0 var(--leaf-radius) var(--leaf-radius) 0;
 }
 .spread-binding {
   background: var(--binding);
@@ -470,16 +487,16 @@
 }
 .opening-lining {
   transform: rotateY(180deg) translateZ(0.5px);
-  border-radius: 30px 0 0 30px;
+  border-radius: var(--leaf-radius) 0 0 var(--leaf-radius);
 }
 .opening-inside {
-  border-radius: 0 30px 30px 0;
+  border-radius: 0 var(--leaf-radius) var(--leaf-radius) 0;
 }
 .opening-page-block {
   position: absolute;
   inset: -2px -5px -4px 0;
   background: var(--binding);
-  border-radius: 0 30px 30px 0;
+  border-radius: 0 var(--leaf-radius) var(--leaf-radius) 0;
   transform: translateZ(-2px);
 }
 .opening-front .book-cover {
@@ -703,10 +720,10 @@
       (0.72 + var(--fan-right) * 0.065 + var(--fan-left) * 0.065)
   );
   height: calc(var(--spread-height) * 0.64);
-  background: #222b4b;
-  opacity: 0.38;
+  background: #1c2445;
+  opacity: 0.5;
   transform: skewX(-3deg);
-  filter: blur(5px);
+  filter: blur(2px);
   pointer-events: none;
 }
 .leaf-left:after {
