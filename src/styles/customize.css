@@ -58,6 +58,7 @@
   width: 195px;
   max-width: 60vw;
   border: 0;
+  font-family: var(--font-display);
   background: transparent;
   color: #fff;
   font-size: 39px;
@@ -76,7 +77,7 @@
   bottom: 0;
   background: #fff;
   color: #222;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--r-card) var(--r-card) 0 0;
   overflow: hidden;
   pointer-events: auto;
   box-shadow: 0 -6px 28px #30303d24;
@@ -160,7 +161,7 @@
   object-fit: cover;
 }
 .cover-options-row > button[aria-pressed="true"] {
-  outline: 3px solid #6b6b80;
+  outline: 3px solid var(--core);
   outline-offset: 3px;
 }
 .photo-cover-option {
@@ -323,7 +324,7 @@
   position: absolute;
   top: 6px;
   right: 7px;
-  background: #111;
+  background: var(--core);
   color: white;
   border-radius: 50%;
   padding: 2px;

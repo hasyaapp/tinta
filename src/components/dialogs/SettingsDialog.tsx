@@ -70,7 +70,7 @@ export default function SettingsDialog({
           className="menu-row"
           onClick={() => {
             update(resetDefaultPalettes);
-            notify("Default palettes restored");
+            notify("Default palettes are back");
           }}
         >
           <Icon name="canvas-tray-add-palette" />

@@ -202,13 +202,13 @@ export function seedLibrary(): Library {
   const welcomeNote = [
     "Welcome to Tinta!",
     "",
-    "Pick a brush and start drawing. Strokes follow the speed of your hand.",
+    "Grab a brush and make a mark. Strokes follow the speed of your hand.",
     "",
-    "• Rewind: made a wrong turn? Scrub back through time with two fingers.",
-    "• Mixer: blend any two colors into a shade of your own.",
-    "• Export: send any page out as an image when it is ready.",
+    "• Rewind: took a wrong turn? Scrub back through time with two fingers.",
+    "• Mixer: blend any two colors into a shade that is all yours.",
+    "• Export: when a page feels ready, send it out as an image.",
     "",
-    "The next pages show a few of the paper templates. This journal is yours: draw over everything.",
+    "The next pages hold a few paper templates. This journal is yours, so draw over everything.",
   ].join("\n");
   const welcomeTemplates = ["", "grid-dot", "writing-lined", "storyboard-2x2"];
   const journals = names.map((name, i) => {

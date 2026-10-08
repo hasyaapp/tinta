@@ -2,6 +2,27 @@ import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { asset } from "../lib/model";
+/** Tinta's ink-drop mark. Inherits currentColor so it fits any context. */
+export function Drop({
+  size = 16,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      className={"ink-drop " + className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 2.4c3.9 5 6.9 8.9 6.9 12.5a6.9 6.9 0 1 1-13.8 0C5.1 11.3 8.1 7.4 12 2.4Z" />
+    </svg>
+  );
+}
 export function Icon({
   name,
   className = "",

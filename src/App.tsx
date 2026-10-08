@@ -31,7 +31,7 @@ import {
   toBlob,
 } from "./lib/images";
 import { Home, Pages } from "./components/LibraryViews";
-import { IconButton } from "./components/UI";
+import { Drop, IconButton } from "./components/UI";
 import DrawingCanvas from "./components/DrawingCanvas";
 import PageCrumple from "./components/PageCrumple";
 import JournalTransition, { COVER_DURATION } from "./components/JournalBook";
@@ -74,7 +74,7 @@ export default function App() {
     [view, setView] = useState<View>("home"),
     [dialog, setDialog] = useState<Dialog>(null),
     [index, setIndex] = useState(0),
-    [saved, setSaved] = useState("Loading journals…"),
+    [saved, setSaved] = useState("Getting your journals"),
     [error, setError] = useState(""),
     [fatal, setFatal] = useState(false),
     [busy, setBusy] = useState(false);
@@ -311,13 +311,13 @@ export default function App() {
       );
       setDialog(null);
       if (view === "canvas") setView("butterfly");
-      notify("Pages deleted");
+      notify("Pages cleared away");
     };
     setConfirm({
       title:
         ids.length === 1 ? "Delete page?" : "Delete " + ids.length + " pages?",
       message:
-        "The selected pages and their notes will be removed from this journal.",
+        "Those pages and their notes will be gone for good.",
       action: () => {
         const only = ids.length === 1 ? lib?.pages[ids[0]] : undefined;
         if (!only || !lib || reducedMotion()) {
@@ -345,7 +345,7 @@ export default function App() {
     if (!journal) return;
     update((l) => duplicatePagesIn(l, journal.id, ids));
     setDialog(null);
-    notify("Page duplicated");
+    notify("Made a copy of that page");
   };
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -369,7 +369,7 @@ export default function App() {
         await toBlob(c),
         (journal?.title || "Tinta") + "-" + (index + 1) + ".png",
       );
-      notify("Image exported");
+      notify("Saved as a PNG");
     });
   const backup = () => {
     if (lib)
@@ -391,14 +391,14 @@ export default function App() {
       if (share && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: journal.title });
-          notify("Journal shared");
+          notify("Journal on its way");
           return;
         } catch (e) {
           if ((e as DOMException).name === "AbortError") return;
         }
       }
       download(file, file.name);
-      notify("Journal file saved");
+      notify("Journal packed into a file");
     });
   const importFile = async (file: File, replace = false) => {
     try {
@@ -410,7 +410,9 @@ export default function App() {
         setView("home");
         setDialog(null);
         setIndex(0);
-        notify("Imported " + (data.journals[0].title || "journal"));
+        notify(
+          "Imported " + (data.journals[0].title || "journal") + ", welcome back",
+        );
         return;
       }
       setConfirm({
@@ -423,7 +425,7 @@ export default function App() {
           setView("home");
           setDialog(null);
           setIndex(0);
-          notify("Backup restored");
+          notify("Everything is back in place");
         },
       });
     } catch (e) {
@@ -482,7 +484,7 @@ export default function App() {
     return (
       <main className="loading-screen">
         <div className="loading-mark">
-          P<span>aper</span>
+          T<span>inta</span>
         </div>
         {fatal ? (
           <>
@@ -491,8 +493,8 @@ export default function App() {
           </>
         ) : (
           <>
-            <div className="loading-orbit" />
-            <p>Opening your journals</p>
+            <Drop size={34} className="loading-drop" />
+            <p>Getting your journals</p>
           </>
         )}
       </main>
@@ -602,7 +604,7 @@ export default function App() {
               setConfirm({
                 title: "Delete this journal?",
                 message:
-                  "All pages in this journal will be removed. This cannot be undone.",
+                  "Every page inside goes with it. There is no undo for this.",
                 action: () => {
                   const remove = () =>
                     update((l) => removeJournal(l, journal!.id));
@@ -694,7 +696,7 @@ export default function App() {
           onDuplicate={() => {
             update((l) => duplicateJournalIn(l, journal.id));
             setDialog(null);
-            notify("Journal duplicated");
+            notify("Made a copy of that journal");
           }}
           onLock={() => setDialog("lock")}
           onExport={() => setDialog("export-journal")}
@@ -706,11 +708,11 @@ export default function App() {
                 journal.pageIds.length +
                 " pages in " +
                 journal.title +
-                " will be removed. This cannot be undone.",
+                " go with it. There is no undo for this.",
               action: () => {
                 update((l) => removeJournal(l, journal.id));
                 setDialog(null);
-                notify("Journal deleted");
+                notify("That journal is gone now");
               },
             })
           }
@@ -737,7 +739,7 @@ export default function App() {
             setIndex(0);
             setDialog(null);
             setView("grid");
-            notify("Pages moved to " + j.title);
+            notify("Pages settled into " + j.title);
           }}
           onClose={() => setDialog(null)}
         />
@@ -773,7 +775,7 @@ export default function App() {
                 lib.settings.exportBackground,
                 lib.templates,
               );
-              notify("PDF exported");
+              notify("PDF ready to share");
             })
           }
           onClose={() => setDialog(null)}
@@ -833,7 +835,7 @@ export default function App() {
       )}
       {toast && (
         <div className="toast" role="status">
-          <Check size={16} />
+          <Drop size={14} />
           {toast}
         </div>
       )}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
 import type { Journal } from "../../lib/model";
-import { Modal } from "../UI";
+import { Drop, Modal } from "../UI";
 
 // Row of the "Your Journals" sheet. Matches the native list: cover, title,
 // page count, modified time, and the order controls. A trailing drag handle is
@@ -89,7 +89,7 @@ export default function SearchDialog({
         <Search size={19} />
         <input
           autoFocus
-          placeholder="Title Search"
+          placeholder="Search by title"
           aria-label="Search journals by title"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -111,9 +111,12 @@ export default function SearchDialog({
             ))}
           </>
         )}
-        <h3 className="journal-list-group">Local ({journals.length})</h3>
+        <h3 className="journal-list-group">On this device ({journals.length})</h3>
         {matches.length === 0 && (
-          <p className="journal-list-empty">No journal matches that title.</p>
+          <p className="journal-list-empty">
+            <Drop size={18} />
+            No journals with that name yet. Try fewer letters.
+          </p>
         )}
         {matches.map(({ j, i }) => (
           <JournalRow

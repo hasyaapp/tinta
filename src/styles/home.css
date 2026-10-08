@@ -32,7 +32,11 @@
   width: 33px;
   height: 33px;
   color: #777e8f;
-  box-shadow: 0 1px 2px #35405815;
+  box-shadow: 0 3px 0 #cfc8ba;
+  transition:
+    background 0.18s,
+    transform 80ms ease,
+    box-shadow 80ms ease;
 }
 .action-strip .icon-button .native-icon {
   width: 24px;
@@ -42,6 +46,10 @@
 .action-strip .icon-button:hover:not(:disabled) {
   background: white;
   transform: translateY(-2px);
+}
+.action-strip .icon-button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 transparent;
 }
 .home-actions {
   position: absolute;
@@ -83,7 +91,7 @@
   transition:
     opacity 0.2s,
     background 0.2s;
-  border-radius: 8px;
+  border-radius: var(--r-btn);
 }
 .home-scene:hover .shelf-arrow,
 .pages-scene:hover .shelf-arrow {
@@ -109,7 +117,7 @@
   top: 52%;
   transform: translate(-50%, -50%);
   border: 1px dashed #ffffff6b;
-  border-radius: 8px;
+  border-radius: var(--r-card);
   display: flex;
   gap: 20px;
   align-items: center;
@@ -275,12 +283,12 @@
   color: #4a6f79;
 }
 .chosen .selection-check {
-  background: #345e62;
+  background: var(--core);
   color: #fff;
 }
 .grid-add {
   border: 1px solid #ffffff48;
-  border-radius: 6px;
+  border-radius: var(--r-btn);
   aspect-ratio: 1.334;
   display: flex;
   align-items: center;

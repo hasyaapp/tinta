@@ -42,6 +42,25 @@
 .canvas-header .icon-button:hover {
   background: #253c4410;
 }
+.canvas-header .icon-button,
+.canvas-header .canvas-pill {
+  border-radius: var(--r-btn);
+  transition: transform 80ms ease;
+}
+.canvas-header .icon-button:active,
+.canvas-header .canvas-pill:active {
+  transform: translateY(2px);
+}
+.canvas-header .canvas-pill {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-header .icon-button:active,
+  .canvas-header .canvas-pill:active {
+    transform: none;
+  }
+}
 .canvas-top-actions .icon-button:nth-child(-n + 2) {
   opacity: 0.5;
 }
@@ -285,6 +304,18 @@
   transform: translate(-50%, -13px);
   filter: brightness(1);
 }
+.drawing-tool.selected:after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: var(--core);
+  pointer-events: none;
+}
 .drawing-tool:hover > img {
   filter: brightness(1);
   transform: translate(-50%, -6px);
@@ -327,6 +358,9 @@
 }
 .tool-tooltip {
   display: none;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 600;
 }
 .color-mixer {
   position: relative;
@@ -407,7 +441,7 @@
   display: flex;
   gap: 8px;
   padding: 8px;
-  border-radius: 12px;
+  border-radius: var(--r-card);
   color: #626c69;
 }
 .size-picker button {
@@ -435,7 +469,7 @@
   color: #465451;
   background: #faf9f3;
   border: 1px solid #e4e3db;
-  border-radius: 15px;
+  border-radius: var(--r-card);
   box-shadow: 0 8px 35px #1c354825;
   font-size: 12px;
 }

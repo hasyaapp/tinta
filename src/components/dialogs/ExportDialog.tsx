@@ -62,7 +62,7 @@ export default function ExportDialog({
         value={exportBackground}
         onChange={onExportBackground}
       />
-      {busy && <p className="muted">Preparing your export…</p>}
+      {busy && <p className="muted">Getting it ready…</p>}
     </Modal>
   );
 }

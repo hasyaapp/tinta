@@ -85,13 +85,11 @@
   resize: vertical;
   min-height: 200px;
   padding: 16px;
-  font:
-    18px/1.5 "Ideal Sans",
-    sans-serif;
+  font: 18px/1.5 var(--font-body);
   color: #383734;
   background: #faf8f3;
   border: 1px solid #d7d4cc;
-  border-radius: 8px;
+  border-radius: var(--r-btn);
   user-select: text;
 }
 .transcribe-dialog .modal-actions {
@@ -114,7 +112,7 @@
 }
 .transcribe-progress progress {
   width: 80%;
-  accent-color: #497988;
+  accent-color: var(--core);
 }
 .canvas-pill .native-icon {
   width: 19px;

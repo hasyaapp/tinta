@@ -162,7 +162,7 @@
   width: 39px;
   height: 39px;
   background: #faf9f8;
-  box-shadow: 0 3px 5px #24294330;
+  box-shadow: 0 3px 0 #cfc8ba;
 }
 .home-actions .native-icon,
 .pages-actions:not(.fixed) .native-icon {
@@ -621,7 +621,7 @@
   height: 40px;
 }
 .app-header .icon-button.active {
-  background: none;
+  background: var(--core);
   box-shadow: none;
 }
 .app-header .header-left,
