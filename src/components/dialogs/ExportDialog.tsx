@@ -1,4 +1,4 @@
-import { FileText, ImagePlus } from "lucide-react";
+import { FileDown, FileText, ImagePlus, Share2 } from "lucide-react";
 import { Modal, Toggle } from "../UI";
 
 interface ExportDialogProps {
@@ -8,6 +8,8 @@ interface ExportDialogProps {
   onExportBackground: (v: boolean) => void;
   onPNG: () => void;
   onPDF: () => void;
+  onFile: () => void;
+  onShare: (() => void) | null;
   onClose: () => void;
 }
 
@@ -17,6 +19,8 @@ export default function ExportDialog({
   exportBackground,
   onExportBackground,
   onPNG,
+  onFile,
+  onShare,
   onPDF,
   onClose,
 }: ExportDialogProps) {
@@ -38,6 +42,20 @@ export default function ExportDialog({
           <strong>PDF document</strong>
           <span>{mode === "page" ? "This page" : "Every idea, in order"}</span>
         </button>
+        {mode === "journal" && (
+          <button disabled={busy} onClick={onFile}>
+            <FileDown size={28} />
+            <strong>Tinta file</strong>
+            <span>Open this journal on another device</span>
+          </button>
+        )}
+        {mode === "journal" && onShare && (
+          <button disabled={busy} onClick={onShare}>
+            <Share2 size={28} />
+            <strong>Share</strong>
+            <span>Send the journal file to another app</span>
+          </button>
+        )}
       </div>
       <Toggle
         label="Include background color"

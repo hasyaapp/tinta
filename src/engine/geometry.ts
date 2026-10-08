@@ -23,10 +23,16 @@ export function polygon(
 }
 export function recognize(
   points: Point[],
-): "line" | "ellipse" | "rectangle" | "triangle" {
+): "line" | "ellipse" | "rectangle" | "triangle" | null {
   const first = points[0],
     last = points.at(-1)!;
   const b = bounds(points);
+  const length = points.reduce(
+    (sum, p, i) =>
+      i ? sum + Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) : 0,
+    0,
+  );
+  if (length > Math.max(24, 2 * (b.width + b.height)) * 2.5) return null;
   if (
     Math.hypot(last.x - first.x, last.y - first.y) >
     Math.hypot(b.width, b.height) * 0.28

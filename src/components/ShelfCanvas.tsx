@@ -41,6 +41,12 @@ export default function ShelfCanvas({
     element.addEventListener("webglcontextlost", onLost);
 
     void (async () => {
+      // Let the CSS books paint first: the shelf module (three.js, ~500 kB)
+      // is fetched after the first frame so it never competes with first paint.
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      if (stopped) return;
       try {
         const { ShelfEngine } = await import("../engine/shelf/ShelfEngine");
         if (stopped) return;

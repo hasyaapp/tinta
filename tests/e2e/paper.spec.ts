@@ -330,6 +330,8 @@ test("fill, diagram, template, color and clean canvas settings", async ({
     [630, 230],
     [870, 440],
   ]);
+  await expect(button(page, "Apply selection")).toBeVisible();
+  await button(page, "Apply selection").click();
   await expect.poll(() => inkCount(page)).toBeGreaterThan(100);
   await button(page, "Templates").click();
   await button(page, "Dot Grid").click();
@@ -400,6 +402,39 @@ test("page duplication, grid move, journal lock and backup restore", async ({
   ).toBeVisible();
   await button(page, "Confirm").click();
   await expect(button(page, "Open Private sketches")).toBeVisible();
+});
+test("journal file export imports on home as an independent copy", async ({
+  page,
+}) => {
+  await blank(page, "Travel log");
+  await button(page, "Close canvas").click();
+  await button(page, "Back to journals").click();
+  await button(page, "Export journal").click();
+  const dl = page.waitForEvent("download");
+  await button(
+    page,
+    "Tinta file Open this journal on another device",
+  ).click();
+  const file = await dl;
+  expect(file.suggestedFilename()).toBe("Travel log.tinta.json");
+  await button(page, "Close dialog").click();
+  const before = await stored(page);
+  await page
+    .locator("main>input[type=file]")
+    .nth(2)
+    .setInputFiles((await file.path())!);
+  await expect(page.getByText("Imported Travel log")).toBeVisible();
+  await expect
+    .poll(async () => (await stored(page)).journals.length)
+    .toBe(before.journals.length + 1);
+  type StoredJournal = { id: string; title: string; pageIds: string[] };
+  const journals: StoredJournal[] = (await stored(page)).journals;
+  const copies = journals.filter((j) => j.title === "Travel log");
+  expect(copies).toHaveLength(2);
+  expect(copies[0].id).not.toBe(copies[1].id);
+  expect(copies[0].pageIds[0]).not.toBe(copies[1].pageIds[0]);
+  const owned = journals.flatMap((j) => j.pageIds);
+  expect(new Set(owned).size).toBe(owned.length);
 });
 
 test("two-finger double tap undoes; single tap opens Rewind without leaving a touch stroke", async ({

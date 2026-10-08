@@ -3,6 +3,8 @@ import { readFileSync, existsSync } from "node:fs";
 import {
   seedLibrary,
   duplicatePage,
+  journalBackup,
+  mergeBackup,
   movePages,
   validateBackup,
   asset,
@@ -21,8 +23,15 @@ describe("journal integrity", () => {
         const p = l.pages[id];
         for (const s of [p.ink, p.fill])
           if (s) expect(existsSync("public" + s), s).toBe(true);
+        if (p.template)
+          expect(templateNames.includes(p.template), p.template).toBe(true);
       }
     }
+    const welcome = l.journals.find((j) => j.title === "Welcome")!;
+    expect(l.pages[welcome.pageIds[0]].note).toContain("Welcome");
+    expect(
+      welcome.pageIds.filter((id) => l.pages[id].template).length,
+    ).toBeGreaterThanOrEqual(3);
     for (const c of coverNames)
       expect(existsSync("public" + asset(c)), c).toBe(true);
     for (const t of templateNames)
@@ -70,6 +79,53 @@ describe("journal integrity", () => {
     const b = seedLibrary();
     Object.values(b.pages)[0].ink = "https://untrusted.example/track";
     expect(() => validateBackup(b)).toThrow();
+  });
+  test("journal export validates and round-trips as a merged copy", () => {
+    const l = seedLibrary();
+    l.templates.push({ id: "custom", src: asset("covers-default-1") });
+    const j = l.journals[2];
+    l.pages[j.pageIds[0]].template = "custom";
+    const payload = validateBackup(
+      JSON.parse(JSON.stringify(journalBackup(l, j.id))),
+    );
+    expect(payload.journals).toHaveLength(1);
+    expect(Object.keys(payload.pages)).toEqual(j.pageIds);
+    expect(payload.templates).toEqual([l.templates[0]]);
+    const merged = mergeBackup(l, payload);
+    expect(merged.journals).toHaveLength(l.journals.length + 1);
+    const copy = merged.journals.at(-1)!;
+    expect(copy.id).not.toBe(j.id);
+    expect(copy.pageIds).toHaveLength(j.pageIds.length);
+    for (const id of copy.pageIds) expect(j.pageIds).not.toContain(id);
+    const owners = merged.journals.flatMap((x) => x.pageIds);
+    expect(new Set(owners).size).toBe(owners.length);
+    expect(owners.length).toBe(Object.keys(merged.pages).length);
+    expect(merged.selected).toBe(merged.journals.indexOf(copy));
+    expect(validateBackup(merged)).toBe(merged);
+  });
+  test("merge keeps ids without collisions and remaps clashing templates", () => {
+    const target = seedLibrary();
+    const source = seedLibrary();
+    source.templates.push({ id: "custom", src: asset("covers-default-2") });
+    target.templates.push({ id: "custom", src: asset("covers-default-3") });
+    const j = source.journals[0];
+    source.pages[j.pageIds[1]].template = "custom";
+    const payload = journalBackup(source, j.id);
+    const merged = mergeBackup(target, payload);
+    const copy = merged.journals.at(-1)!;
+    expect(copy.id).toBe(j.id);
+    expect(copy.pageIds).toEqual(j.pageIds);
+    const remapped = merged.pages[copy.pageIds[1]].template;
+    expect(remapped).not.toBe("custom");
+    expect(merged.templates.find((t) => t.id === remapped)?.src).toBe(
+      asset("covers-default-2"),
+    );
+    expect(merged.templates.find((t) => t.id === "custom")?.src).toBe(
+      asset("covers-default-3"),
+    );
+    expect(merged.palettes).toBe(target.palettes);
+    expect(merged.settings).toBe(target.settings);
+    expect(validateBackup(merged)).toBe(merged);
   });
 });
 describe("drawing primitives", () => {

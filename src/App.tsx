@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import type { Journal, Library, Page } from "./lib/model";
 import {
+  journalBackup,
+  mergeBackup,
   movePages,
   newJournal,
   newPage,
@@ -60,6 +62,11 @@ type Dialog =
   | "help"
   | "lock"
   | "unlock";
+const canShareFiles =
+  typeof navigator !== "undefined" &&
+  !!navigator.canShare?.({
+    files: [new File(["{}"], "journal.tinta.json", { type: "application/json" })],
+  });
 
 export default function App() {
   const [lib, setLib] = useState<Library | null>(null),
@@ -78,7 +85,8 @@ export default function App() {
     [toast, setToast] = useState(""),
     [moveIds, setMoveIds] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null),
-    coverRef = useRef<HTMLInputElement>(null);
+    coverRef = useRef<HTMLInputElement>(null),
+    importRef = useRef<HTMLInputElement>(null);
   const revision = useRef(0),
     unlocked = useRef(new Set<string>()),
     afterUnlock = useRef<(() => void) | null>(null);
@@ -371,11 +379,39 @@ export default function App() {
           ".tinta.json",
       );
   };
-  const restore = async (file: File) => {
+  const exportJournal = (share: boolean) =>
+    run(async () => {
+      if (!lib || !journal) return;
+      const file = new File(
+        [JSON.stringify(journalBackup(lib, journal.id))],
+        (journal.title || "Tinta") + ".tinta.json",
+        { type: "application/json" },
+      );
+      if (share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: journal.title });
+          notify("Journal shared");
+          return;
+        } catch (e) {
+          if ((e as DOMException).name === "AbortError") return;
+        }
+      }
+      download(file, file.name);
+      notify("Journal file saved");
+    });
+  const importFile = async (file: File, replace = false) => {
     try {
       if (file.size > 150 * 1024 * 1024)
         throw new Error("Choose a backup smaller than 150 MB.");
       const data = validateBackup(JSON.parse(await file.text()));
+      if (!replace && data.journals.length === 1) {
+        update((l) => mergeBackup(l, data));
+        setView("home");
+        setDialog(null);
+        setIndex(0);
+        notify("Imported " + (data.journals[0].title || "journal"));
+        return;
+      }
       setConfirm({
         title: "Restore these journals?",
         message:
@@ -393,6 +429,46 @@ export default function App() {
       setError(e instanceof Error ? e.message : "Invalid backup.");
     }
   };
+  // Journal files dropped on the shelf import in place; the OS can also hand
+  // Tinta a .tinta.json through the PWA file handler's launch queue.
+  useEffect(() => {
+    if (view !== "home") return;
+    const over = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+    };
+    const drop = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      e.preventDefault();
+      const file = Array.from(e.dataTransfer.files).find((f) =>
+        f.name.endsWith(".json"),
+      );
+      if (file) void importFile(file);
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("drop", drop);
+    };
+  });
+  useEffect(() => {
+    const queue = (
+      window as Window & {
+        launchQueue?: {
+          setConsumer(
+            consume: (params: {
+              files?: { getFile(): Promise<File> }[];
+            }) => void,
+          ): void;
+        };
+      }
+    ).launchQueue;
+    queue?.setConsumer((params) => {
+      for (const handle of params.files || [])
+        void handle.getFile().then(importFile);
+    });
+    // Setters and update/notify are stable, so the first closure stays valid.
+  }, []);
   const batch = (ids: string[], action: string) => {
     if (action === "delete") deletePages(ids);
     if (action === "duplicate") duplicatePages(ids);
@@ -461,7 +537,13 @@ export default function App() {
       {view !== "canvas" && (
         <header className="app-header">
           <div className="header-left">
-            {view !== "home" && (
+            {view === "home" ? (
+              <IconButton
+                label="Import journal"
+                name="shell-import-journal"
+                onClick={() => importRef.current?.click()}
+              />
+            ) : (
               <>
                 <IconButton
                   label="Back to journals"
@@ -678,6 +760,8 @@ export default function App() {
             }))
           }
           onPNG={exportPNG}
+          onFile={() => exportJournal(false)}
+          onShare={canShareFiles ? () => exportJournal(true) : null}
           onPDF={() =>
             run(async () => {
               await exportPDF(
@@ -758,7 +842,7 @@ export default function App() {
         type="file"
         accept=".json,.paper-web.json"
         onChange={(e) => {
-          if (e.target.files?.[0]) void restore(e.target.files[0]);
+          if (e.target.files?.[0]) void importFile(e.target.files[0], true);
           e.target.value = "";
         }}
       />
@@ -774,6 +858,16 @@ export default function App() {
               const im = await fileImage(file);
               changeJournal((j) => ({ ...j, cover: im.src }));
             });
+          e.target.value = "";
+        }}
+      />
+      <input
+        hidden
+        ref={importRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={(e) => {
+          if (e.target.files?.[0]) void importFile(e.target.files[0]);
           e.target.value = "";
         }}
       />

@@ -622,17 +622,36 @@ export default function DrawingCanvas({
     commit({ ...draft.current, fill: c.toDataURL() });
   }
   function diagram(path: Point[], arrow: boolean) {
-    const c = canvas(page.width, page.height),
+    const kind = recognize(path),
+      lineWidth = { sm: 2, md: 4, lg: 7 }[size];
+    if (!kind) {
+      const c = canvas(page.width, page.height),
+        ctx = c.getContext("2d")!;
+      engine.current!.present();
+      ctx.drawImage(engine.current!.canvas, 0, 0);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      polygon(ctx, path, false);
+      ctx.stroke();
+      engine.current!.loadCanvas(c);
+      paint();
+      commit({ ...draft.current, ink: c.toDataURL() });
+      return;
+    }
+    const b = bounds(path),
+      pad = Math.ceil(lineWidth) + (kind === "line" && arrow ? 12 : 2),
+      w = Math.ceil(Math.max(1, b.width)) + pad * 2,
+      h = Math.ceil(Math.max(1, b.height)) + pad * 2;
+    const c = canvas(w, h),
       ctx = c.getContext("2d")!;
-    engine.current!.present();
-    ctx.drawImage(engine.current!.canvas, 0, 0);
+    ctx.translate(pad - b.x, pad - b.y);
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
-    ctx.lineWidth = { sm: 2, md: 4, lg: 7 }[size];
+    ctx.lineWidth = lineWidth;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    const b = bounds(path),
-      kind = recognize(path);
     ctx.beginPath();
     if (kind === "line") {
       ctx.moveTo(path[0].x, path[0].y);
@@ -675,9 +694,17 @@ export default function DrawingCanvas({
       ctx.rect(b.x, b.y, b.width, b.height);
       ctx.stroke();
     }
-    engine.current!.loadCanvas(c);
-    paint();
-    commit({ ...draft.current, ink: c.toDataURL() });
+    setSelection({
+      id: uid(),
+      src: c.toDataURL(),
+      x: b.x - pad,
+      y: b.y - pad,
+      width: w,
+      height: h,
+      rotation: 0,
+      kind: "ink",
+      before: structuredClone(draft.current),
+    });
   }
   function pointerDown(e: ReactPointerEvent<HTMLCanvasElement>) {
     if (!ready || restoring.current || rewindRef.current || e.button !== 0)

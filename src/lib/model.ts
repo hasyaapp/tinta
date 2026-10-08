@@ -199,11 +199,24 @@ export function seedLibrary(): Library {
     "covers-default-5",
   ];
   const counts = [2, 2, 4, 2, 6];
+  const welcomeNote = [
+    "Welcome to Tinta!",
+    "",
+    "Pick a brush and start drawing. Strokes follow the speed of your hand.",
+    "",
+    "• Rewind: made a wrong turn? Scrub back through time with two fingers.",
+    "• Mixer: blend any two colors into a shade of your own.",
+    "• Export: send any page out as an image when it is ready.",
+    "",
+    "The next pages show a few of the paper templates. This journal is yours: draw over everything.",
+  ].join("\n");
+  const welcomeTemplates = ["", "grid-dot", "writing-lined", "storyboard-2x2"];
   const journals = names.map((name, i) => {
     const j = newJournal(name, asset(covers[i]));
     j.band = ["#cf8d61", "#39494b", "#c45458", "#d9c2bc", "#139770"][i];
     for (let n = 0; n < counts[i]; n++) {
-      const p = newPage();
+      const p = newPage(name === "Welcome" ? (welcomeTemplates[n] ?? "") : "");
+      if (name === "Welcome" && n === 0) p.note = welcomeNote;
       pages[p.id] = p;
       j.pageIds.push(p.id);
     }
@@ -370,6 +383,64 @@ export function validateBackup(input: unknown): Library {
   if (Object.keys(l.pages).some((id) => !seen.has(id)))
     throw new Error("Backup contains unassigned pages.");
   return l;
+}
+export function journalBackup(l: Library, journalId: string): Library {
+  const journal = l.journals.find((j) => j.id === journalId);
+  if (!journal) throw new Error("Journal not found.");
+  const pages: Record<string, Page> = {};
+  for (const id of journal.pageIds) pages[id] = l.pages[id];
+  const used = new Set(
+    [journal.template, ...journal.pageIds.map((id) => l.pages[id].template)],
+  );
+  return structuredClone({
+    version: 1,
+    journals: [journal],
+    pages,
+    palettes: l.palettes,
+    clips: [],
+    templates: l.templates.filter((t) => used.has(t.id)),
+    settings: l.settings,
+    selected: 0,
+  });
+}
+export function mergeBackup(l: Library, incoming: Library): Library {
+  const pages = { ...l.pages };
+  const templates = [...l.templates];
+  const renamedTemplates = new Map<string, string>();
+  for (const t of incoming.templates) {
+    const existing = l.templates.find((x) => x.id === t.id);
+    if (existing?.src === t.src) continue;
+    const id = existing ? uid() : t.id;
+    if (existing) renamedTemplates.set(t.id, id);
+    templates.push({ id, src: t.src });
+  }
+  const journalIds = new Set(l.journals.map((j) => j.id));
+  const added = incoming.journals.map((j) => {
+    const copy: Journal = {
+      ...structuredClone(j),
+      id: journalIds.has(j.id) ? uid() : j.id,
+      template: renamedTemplates.get(j.template) ?? j.template,
+      pageIds: [],
+      updatedAt: Date.now(),
+    };
+    for (const id of j.pageIds) {
+      const source = incoming.pages[id];
+      const p = Object.hasOwn(pages, id)
+        ? duplicatePage(source)
+        : structuredClone(source);
+      p.template = renamedTemplates.get(p.template) ?? p.template;
+      pages[p.id] = p;
+      copy.pageIds.push(p.id);
+    }
+    return copy;
+  });
+  return {
+    ...l,
+    journals: [...l.journals, ...added],
+    pages,
+    templates,
+    selected: l.journals.length,
+  };
 }
 export async function pinHash(pin: string, salt: string) {
   const d = await crypto.subtle.digest(

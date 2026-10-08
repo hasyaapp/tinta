@@ -21,6 +21,7 @@ void main(){
  float a=(1.0-smoothstep(.84,1.0,length(q)));vec4 m=texture(previousMask,uv);vec4 base=texture(baseInk,uv);
  if(mode==5){
    float soft=exp(-dot(q,q)*3.5)*step(length(q),1.0)*strength;
+   soft*=.75+.5*texture(noiseTex,p/256.0).r;
    vec2 d=direction/resolution*vec2(-1.,1.);vec2 px=2.0/resolution;
    vec4 b=texture(previousInk,clamp(uv+d,vec2(0),vec2(1)))*.4;
    b+=(texture(previousInk,clamp(uv+d+vec2(px.x,0),vec2(0),vec2(1)))+texture(previousInk,clamp(uv+d-vec2(px.x,0),vec2(0),vec2(1)))+texture(previousInk,clamp(uv+d+vec2(0,px.y),vec2(0),vec2(1)))+texture(previousInk,clamp(uv+d-vec2(0,px.y),vec2(0),vec2(1))))*.15;
@@ -38,13 +39,19 @@ void main(){
    float fill=texture(stampTex,clamp(coord,vec2(0),vec2(1))).a;
    vec2 rot=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*q*.5+.5;
    float edge=texture(edgeTex,clamp(rot,vec2(0),vec2(1))).a;
-   float wash=a*(.32+.4*fill+.28*edge)*strength;
+   float wet=clamp(base.a,0.,1.);
+   float aw=1.-smoothstep(.8,1.+.12*wet,length(q));
+   float wash=aw*(.3+.38*fill+.28*edge)*strength*(1.+.3*wet);
    coverage=1.-(1.-m.r)*(1.-wash);
  }else{coverage=max(m.r,a*strength);}
  mask=vec4(coverage,0.,0.,coverage);
  if(mode==1){ink=base*(1.-coverage);return;}
  float opacity=coverage*color.a;
- if(mode==3)opacity=pow(coverage,.75)*color.a;
+ if(mode==3){
+   float rim=coverage*(1.-coverage)*4.0;
+   float gran=texture(noiseTex,p/330.0).g;
+   opacity=pow(coverage,.75)*color.a*(1.+.28*rim)*(.9+.2*gran*min(1.,coverage*1.6));
+ }
  vec4 s=vec4(color.rgb*opacity,opacity);
  if(mode==4){
    vec3 mul=s.rgb*base.rgb+s.rgb*(1.-base.a)+base.rgb*(1.-s.a);
@@ -71,6 +78,11 @@ export class InkEngine {
   private uniforms = new Map<string, WebGLUniformLocation>();
   private last: Sample | null = null;
   private previousRadius = 2;
+  private speed = 0;
+  private strokeDist = 0;
+  private flow = 1;
+  private alphaGain = 1;
+  private colorBuf = new Float32Array(4);
   private tool: Tool = "draw";
   private size: BrushSize = "md";
   private color = [0, 0, 0, 1];
@@ -310,10 +322,12 @@ export class InkEngine {
       g.clear(g.COLOR_BUFFER_BIT);
     }
     this.last = sample;
-    this.previousRadius = this.getRadius(sample, 0);
+    this.speed = 0;
+    this.strokeDist = 0;
+    this.previousRadius = this.dynamics(sample);
     this.dab(sample, this.previousRadius, 0, 0);
   }
-  private getRadius(s: Sample, speed: number) {
+  private dynamics(s: Sample) {
     const multiplier = { sm: 0.55, md: 1, lg: 1.8 }[this.size];
     const base: Partial<Record<Tool, number>> = {
       draw: 4,
@@ -325,10 +339,39 @@ export class InkEngine {
       color: 30,
     };
     const p = s.pressure || 0.5;
+    const v = this.speed;
     let r = (base[this.tool] || 4) * multiplier;
-    if (this.tool === "draw")
-      r *= Math.max(0.3, 1.2 - speed * 0.12) * (0.5 + p);
-    if (this.tool === "sketch") r *= 0.5 + p + s.tilt / 28;
+    this.flow = 1;
+    this.alphaGain = 1;
+    switch (this.tool) {
+      case "draw":
+        r *= Math.max(0.3, 1.2 - v * 0.12) * (0.5 + p);
+        break;
+      case "sketch":
+        r *= (0.5 + p + s.tilt / 28) * Math.max(0.55, 1.12 - v * 0.09);
+        this.flow = Math.max(0.5, 1.08 - v * 0.08);
+        break;
+      case "write":
+        r *= (0.75 + 0.5 * p) * Math.max(0.62, 1.06 - v * 0.055);
+        break;
+      case "marker": {
+        const startTaper = Math.min(1, 0.7 + this.strokeDist / (r * 5));
+        const tip = Math.min(1, 0.82 + v * 0.3);
+        r *= (0.9 + 0.2 * p) * startTaper * tip;
+        this.alphaGain = 1 + 0.15 * Math.exp(-v * 1.2);
+        break;
+      }
+      case "color":
+        r *= (0.85 + 0.3 * p) * (1 + Math.min(0.3, v * 0.05));
+        this.flow = (0.7 + 0.9 * Math.exp(-v * 0.6)) * (0.6 + 0.8 * p);
+        break;
+      case "erase":
+        r *= (0.8 + 0.4 * p) * (1 + Math.min(0.5, v * 0.06));
+        break;
+      case "blend":
+        r *= 1 + Math.min(0.45, v * 0.05);
+        break;
+    }
     return Math.max(0.7, r);
   }
   append(s: Sample) {
@@ -337,8 +380,10 @@ export class InkEngine {
     const dx = s.x - last.x,
       dy = s.y - last.y;
     const d = Math.hypot(dx, dy),
-      speed = d / Math.max(1, s.time - last.time);
-    const radius = this.getRadius(s, speed);
+      dt = Math.max(1, s.time - last.time);
+    this.speed += (d / dt - this.speed) * Math.min(1, dt / 45);
+    this.strokeDist += d;
+    const radius = this.dynamics(s);
     const steps = Math.max(
       1,
       Math.ceil(d / Math.max(1, Math.min(radius, this.previousRadius) * 0.28)),
@@ -364,10 +409,11 @@ export class InkEngine {
     const g = this.gl,
       w = this.canvas.width,
       h = this.canvas.height;
-    const x = Math.max(0, Math.floor(s.x - r - 3)),
-      y = Math.max(0, Math.floor(h - s.y - r - 3));
-    const right = Math.min(w, Math.ceil(s.x + r + 3)),
-      top = Math.min(h, Math.ceil(h - s.y + r + 3));
+    const pad = this.tool === "color" ? r * 0.15 + 3 : 3;
+    const x = Math.max(0, Math.floor(s.x - r - pad)),
+      y = Math.max(0, Math.floor(h - s.y - r - pad));
+    const right = Math.min(w, Math.ceil(s.x + r + pad)),
+      top = Math.min(h, Math.ceil(h - s.y + r + pad));
     if (right <= x || top <= y) return;
     g.useProgram(this.program);
     g.bindFramebuffer(g.FRAMEBUFFER, this.b.fbo);
@@ -407,17 +453,21 @@ export class InkEngine {
     );
     g.uniform2f(this.u("point"), s.x, s.y);
     g.uniform2f(this.u("direction"), dx * 0.7, dy * 0.7);
-    g.uniform4fv(this.u("color"), this.color);
+    this.colorBuf[0] = this.color[0];
+    this.colorBuf[1] = this.color[1];
+    this.colorBuf[2] = this.color[2];
+    this.colorBuf[3] = Math.min(1, this.color[3] * this.alphaGain);
+    g.uniform4fv(this.u("color"), this.colorBuf);
     g.uniform1f(this.u("radius"), r);
     g.uniform1f(
       this.u("strength"),
-      this.tool === "color"
+      (this.tool === "color"
         ? 0.13
         : this.tool === "sketch"
           ? 0.38
           : this.tool === "blend"
             ? 0.65
-            : 1,
+            : 1) * this.flow,
     );
     g.uniform1f(this.u("angle"), this.angle);
     g.drawArrays(g.TRIANGLES, 0, 3);

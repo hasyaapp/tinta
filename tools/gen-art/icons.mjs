@@ -25,6 +25,7 @@ export const icons = {
     .join(""),
   "shell-journal-search": `<circle cx="10.3" cy="10.3" r="6.3" ${S}/><path d="M15 15l5 5" stroke="#111" stroke-width="2.4" stroke-linecap="round"/>`,
   "shell-settings": gear(),
+  "shell-import-journal": `<path d="M7.5 9.5H5V21h14V9.5h-2.5" ${S}/><path d="M12 3v11.2M8 10.4l4 3.8 4-3.8" ${S}/>`,
 
   "shell-control-strip-duplicate": `<rect x="9" y="9" width="11" height="11" rx="2" ${S}/><path d="M4.5 15V6.5a2 2 0 0 1 2-2H15" ${S}/>`,
   "shell-control-strip-share": `<path d="M7.5 9.5H5V21h14V9.5h-2.5" ${S}/><path d="M12 14.5V3M8 6.6 12 2.8l4 3.8" ${S}/>`,
