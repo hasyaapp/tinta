@@ -20,11 +20,9 @@ createRoot(document.getElementById("root")!).render(
 );
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  // Updates install in the background and wait until every tab from the old
+  // version is closed; a running drawing session is never reloaded under it.
   window.addEventListener("load", () => {
-    const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (hadController) location.reload();
-    });
     void navigator.serviceWorker
       .register(import.meta.env.BASE_URL + "sw.js", { updateViaCache: "none" })
       .then((registration) => registration.update())

@@ -914,9 +914,15 @@ export default function DrawingCanvas({
     clearOverlay();
     const start = strokeStart.current,
       end = position(e);
+    // A page swipe must be a straight horizontal flick; a curving stroke that
+    // merely starts near the edge is real drawing and keeps its ink.
+    const straight =
+      !!start &&
+      points.current.every((p) => Math.abs(p.y - start.y) < 48);
     if (
       e.pointerType === "touch" &&
       start &&
+      straight &&
       ((start.x < 22 && end.x - start.x > 70) ||
         (start.x > page.width - 22 && start.x - end.x > 70))
     ) {
