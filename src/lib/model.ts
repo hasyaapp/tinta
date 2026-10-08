@@ -67,10 +67,7 @@ export interface Library {
   selected: number;
 }
 export const asset = (name: string) =>
-  import.meta.env.BASE_URL +
-  "art/" +
-  name.toLowerCase().replace(/[\/\s]+/g, "-") +
-  ".svg";
+  import.meta.env.BASE_URL + "art/" + name + ".svg";
 export const uid = () => crypto.randomUUID();
 export const paletteDefaults = [
   ["#173d4a", "#ed5340", "#ffba3b", "#f9ebc4", "#6f9766", "#a8c6c1", "#ffffff"],
@@ -143,9 +140,9 @@ export const templateAsset = (name: string, width: number, height: number) =>
   /^data:image\/(png|jpeg|webp);base64,/.test(name)
     ? name
     : asset(
-        "Journal/Templates/" +
-          (height > width ? "Portrait" : "Landscape") +
-          "/" +
+        "journal-templates-" +
+          (height > width ? "portrait" : "landscape") +
+          "-" +
           name,
       );
 export const coverNames = [

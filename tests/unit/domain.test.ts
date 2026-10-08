@@ -26,9 +26,9 @@ describe("journal integrity", () => {
     for (const c of coverNames)
       expect(existsSync("public" + asset(c)), c).toBe(true);
     for (const t of templateNames)
-      for (const folder of ["Thumbnails", "Landscape", "Portrait"])
+      for (const folder of ["thumbnails", "landscape", "portrait"])
         expect(
-          existsSync("public" + asset("Journal/Templates/" + folder + "/" + t)),
+          existsSync("public" + asset("journal-templates-" + folder + "-" + t)),
           t,
         ).toBe(true);
   });

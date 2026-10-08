@@ -1,0 +1,138 @@
+/* Pointer gestures complement the original illustrated controls. */
+.drawing-tool,
+.palettes {
+  touch-action: none;
+}
+.swatch[data-empty="true"] {
+  border: 1px solid #b9b6b160;
+  box-shadow: none;
+}
+.rewind-trigger {
+  display: flex;
+  align-items: center;
+  touch-action: none;
+}
+.rewind-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 48;
+  touch-action: none;
+}
+.rewind-dial {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  color: #555;
+  filter: drop-shadow(0 5px 10px #0002);
+}
+.rewind-wheel {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: auto;
+  border-radius: 50%;
+  background: #fcfbf2dc;
+  border: 1px solid #aaa4;
+  touch-action: none;
+  cursor: grab;
+  box-shadow: inset 0 0 20px #9f9b951f;
+}
+.rewind-ticks {
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    #6668 0deg 1deg,
+    transparent 1deg 7.5deg
+  );
+  mask: radial-gradient(transparent 0 64%, #000 65%);
+}
+.rewind-center {
+  position: absolute;
+  inset: 50px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+.rewind-center img {
+  width: 55px;
+  height: 48px;
+  object-fit: contain;
+}
+.rewind-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 8px;
+  border-radius: 25px;
+  background: #fffdf3ea;
+  padding: 3px;
+}
+.rewind-actions > button:not(.icon-button) {
+  font-size: 12px;
+  padding: 10px 16px;
+}
+.rewind-actions .native-icon {
+  width: 30px;
+  height: 30px;
+}
+.transcribe-dialog textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  min-height: 200px;
+  padding: 16px;
+  font:
+    18px/1.5 "Ideal Sans",
+    sans-serif;
+  color: #383734;
+  background: #faf8f3;
+  border: 1px solid #d7d4cc;
+  border-radius: 8px;
+  user-select: text;
+}
+.transcribe-dialog .modal-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.transcribe-dialog .modal-actions button {
+  min-height: 42px;
+  padding: 10px 14px;
+}
+.transcribe-dialog .modal-body > p {
+  margin-bottom: 12px;
+}
+.transcribe-progress {
+  padding: 30px 0;
+  text-align: center;
+}
+.transcribe-progress progress {
+  width: 80%;
+  accent-color: #497988;
+}
+.canvas-pill .native-icon {
+  width: 19px;
+  height: 19px;
+  object-fit: contain;
+}
+.drag-color {
+  position: fixed;
+  z-index: 1000;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 3px 16px #0005;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.color-mixer,
+.show-tray {
+  touch-action: none;
+}

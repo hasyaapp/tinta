@@ -163,22 +163,22 @@ export function Home({
           <div className="home-actions action-strip">
             <IconButton
               label="Journal options"
-              name="Shell/Control Strip/more-menu"
+              name="shell-control-strip-more-menu"
               onClick={onMenu}
             />
             <IconButton
               label="Export journal"
-              name="Shell/Control Strip/share"
+              name="shell-control-strip-share"
               onClick={onExport}
             />
             <IconButton
               label="Delete journal"
-              name="Shell/Control Strip/delete"
+              name="shell-control-strip-delete"
               onClick={onDelete}
             />
             <IconButton
               label="New journal"
-              name="Shell/Control Strip/add-journal"
+              name="shell-control-strip-add-journal"
               onClick={onAdd}
             />
           </div>
@@ -497,8 +497,8 @@ export function Pages({
             label={selecting ? "Cancel selection" : "Select pages"}
             name={
               selecting
-                ? "Shell/Control Strip/exit-mode"
-                : "Shell/Control Strip/multiselect-mode"
+                ? "shell-control-strip-exit-mode"
+                : "shell-control-strip-multiselect-mode"
             }
             active={selecting}
             onClick={() => {
@@ -511,7 +511,7 @@ export function Pages({
           <>
             <IconButton
               label="Duplicate selected pages"
-              name="Shell/Control Strip/duplicate"
+              name="shell-control-strip-duplicate"
               disabled={!selected.length}
               onClick={() => {
                 onBatch(selected, "duplicate");
@@ -521,13 +521,13 @@ export function Pages({
             />
             <IconButton
               label="Move selected pages"
-              name="Shell/Control Strip/move"
+              name="shell-control-strip-move"
               disabled={!selected.length}
               onClick={() => onBatch(selected, "move")}
             />
             <IconButton
               label="Delete selected pages"
-              name="Shell/Control Strip/delete"
+              name="shell-control-strip-delete"
               disabled={!selected.length}
               onClick={() => {
                 onBatch(selected, "delete");
@@ -540,30 +540,30 @@ export function Pages({
           <>
             <IconButton
               label="Page options"
-              name="Shell/Control Strip/more-menu"
+              name="shell-control-strip-more-menu"
               onClick={onMenu}
               disabled={!page}
             />
             <IconButton
               label="Export page"
-              name="Shell/Control Strip/share"
+              name="shell-control-strip-share"
               onClick={onExport}
               disabled={!page}
             />
             <IconButton
               label="Delete page"
-              name="Shell/Control Strip/delete"
+              name="shell-control-strip-delete"
               onClick={onDelete}
               disabled={!page}
             />
             <IconButton
               label="Add text note"
-              name="Shell/Control Strip/text-note"
+              name="shell-control-strip-text-note"
               onClick={onNote}
             />
             <IconButton
               label="New page"
-              name="Shell/Control Strip/add-journal"
+              name="shell-control-strip-add-journal"
               onClick={onAdd}
             />
           </>

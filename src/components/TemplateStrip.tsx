@@ -66,7 +66,7 @@ export default function TemplateStrip({
                 (n.startsWith("storyboard") ? "storyboard" : "")
               }
             >
-              <img src={asset("Journal/Templates/Thumbnails/" + n)} alt="" />
+              <img src={asset("journal-templates-thumbnails-" + n)} alt="" />
               {selected === n && <Check className="template-check" size={18} />}
             </div>
           </button>

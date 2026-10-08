@@ -1,39 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clipboard,
-  Copy,
-  Download,
-  FileText,
-  Maximize,
-  MoreHorizontal,
-  Plus,
-  RotateCw,
-  Scissors,
-  Trash2,
-  X,
-} from "lucide-react";
+import type { PointerEvent as ReactPointerEvent } from "react";
+import { ChevronLeft, ChevronRight, Maximize, Plus, X } from "lucide-react";
 import type { BrushSize, Clip, Library, Page, Photo, Tool } from "../lib/model";
-import { asset, templateNames, tools, uid } from "../lib/model";
+import { tools, uid } from "../lib/model";
 import { canvas, composePage, fileImage, loadImage } from "../lib/images";
 import {
   readCanvasPreferences,
   saveCanvasPreferences,
 } from "../lib/preferences";
-import { mixColors } from "../lib/color";
 import { bounds, floodMask, polygon, recognize } from "../engine/geometry";
 import type { Point } from "../engine/geometry";
 import { InkEngine } from "../engine/InkEngine";
 import type { Sample } from "../engine/InkEngine";
-import { Icon, IconButton, Modal } from "./UI";
+import { Icon, IconButton } from "./UI";
 import ColorPanel from "./ColorPanel";
 import TemplateStrip from "./TemplateStrip";
 import RewindDial from "./RewindDial";
 import TranscribeDialog from "./TranscribeDialog";
 import { historyFrames, seekHistory } from "../lib/rewind";
+import CanvasHeader from "./canvas/CanvasHeader";
+import type { ToolGesture } from "./canvas/CanvasHeader";
+import SelectionOverlay from "./canvas/SelectionOverlay";
+import SelectionActions from "./canvas/SelectionActions";
+import PaletteRow from "./canvas/PaletteRow";
+import ToolRow from "./canvas/ToolRow";
+import PanelModals from "./canvas/PanelModals";
+import useColorDrag from "./canvas/useColorDrag";
 
 interface Props {
   page: Page;
@@ -48,7 +40,7 @@ interface Props {
   onNewPage: () => void;
   notify: (s: string) => void;
 }
-type Selection = Photo & { kind: "ink" | "photo"; before?: Page };
+export type Selection = Photo & { kind: "ink" | "photo"; before?: Page };
 const asPhoto = (s: Photo): Photo => ({
   id: s.id,
   src: s.src,
@@ -78,8 +70,7 @@ export default function DrawingCanvas({
     base = useRef<HTMLCanvasElement>(null),
     ink = useRef<HTMLCanvasElement>(null),
     overlay = useRef<HTMLCanvasElement>(null),
-    file = useRef<HTMLInputElement>(null),
-    trayScroll = useRef<HTMLDivElement>(null);
+    file = useRef<HTMLInputElement>(null);
   const engine = useRef<InkEngine | null>(null),
     draft = useRef(page),
     alive = useRef(true),
@@ -135,28 +126,18 @@ export default function DrawingCanvas({
   const restoreSequence = useRef(0),
     restoring = useRef(false);
   const lastInk = useRef("#173d4a");
-  const toolGesture = useRef<{
-    id: Tool;
-    y: number;
-    size: BrushSize;
-    changed: boolean;
-    timer: ReturnType<typeof setTimeout> | null;
-  } | null>(null);
-  const ignoreToolClick = useRef(false),
-    paletteSwipe = useRef<{ x: number; y: number } | null>(null),
-    ignorePaletteClick = useRef(false);
-  const colorDrag = useRef<{
-    hex: string;
-    x: number;
-    y: number;
-    active: boolean;
-    timer: ReturnType<typeof setTimeout> | null;
-  } | null>(null);
-  const [dragColor, setDragColor] = useState<{
-    hex: string;
-    x: number;
-    y: number;
-  } | null>(null);
+  const toolGesture = useRef<ToolGesture | null>(null);
+  const ignoreToolClick = useRef(false);
+  const colorDrag = useColorDrag(
+    (index, hex) =>
+      onLibraryChange((l) => ({
+        ...l,
+        palettes: l.palettes.map((p, i) =>
+          i === palette ? p.map((c, n) => (n === index ? hex : c)) : p,
+        ),
+      })),
+    (hex) => commit({ ...draft.current, background: hex }),
+  );
   const photoCut = useRef<string | null>(null),
     traySwipe = useRef(0);
   const selectionRef = useRef(selection);
@@ -167,14 +148,6 @@ export default function DrawingCanvas({
       customColor || library.palettes[palette]?.[swatch] || lastInk.current,
     size = sizes[tool] || "md";
   lastInk.current = color;
-  const options = useRef({
-    tool,
-    size,
-    color,
-    picker,
-    settings: library.settings,
-  });
-  options.current = { tool, size, color, picker, settings: library.settings };
   const pinch = useRef<{
     distance: number;
     center: Point;
@@ -183,13 +156,7 @@ export default function DrawingCanvas({
     initial: Point[];
     moved: boolean;
   } | null>(null);
-  const mixer = useRef<{
-      angle: number;
-      amount: number;
-      from: string;
-      to: string;
-    } | null>(null),
-    mixedColor = useRef("#e9d6a5");
+  const mixedColor = useRef("#e9d6a5");
 
   async function drawBase(p: Page) {
     const t = ++renderTicket.current;
@@ -388,79 +355,6 @@ export default function DrawingCanvas({
     },
     [],
   );
-  function startColorDrag(
-    e: ReactPointerEvent<HTMLElement>,
-    hex: string,
-    delay = 400,
-  ) {
-    if (!hex || e.button !== 0) return;
-    if (colorDrag.current?.timer) clearTimeout(colorDrag.current.timer);
-    const g = {
-      hex,
-      x: e.clientX,
-      y: e.clientY,
-      active: false,
-      timer: null as ReturnType<typeof setTimeout> | null,
-    };
-    g.timer = setTimeout(() => {
-      g.active = true;
-      setDragColor({ hex: g.hex, x: g.x, y: g.y });
-    }, delay);
-    colorDrag.current = g;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  }
-  function moveColorDrag(
-    e: ReactPointerEvent<HTMLElement>,
-    swatchDrag = false,
-  ) {
-    const g = colorDrag.current;
-    if (!g) return false;
-    const dx = e.clientX - g.x,
-      dy = e.clientY - g.y;
-    if (!g.active && Math.hypot(dx, dy) > 8) {
-      if (g.timer) clearTimeout(g.timer);
-      g.timer = null;
-      if (swatchDrag && Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx) * 1.3)
-        g.active = true;
-    }
-    if (g.active) {
-      e.preventDefault();
-      paletteSwipe.current = null;
-      ignorePaletteClick.current = true;
-      setDragColor({ hex: g.hex, x: e.clientX, y: e.clientY });
-      return true;
-    }
-    return false;
-  }
-  function endColorDrag(e?: ReactPointerEvent<HTMLElement>) {
-    const g = colorDrag.current;
-    if (!g) return false;
-    if (g.timer) clearTimeout(g.timer);
-    colorDrag.current = null;
-    setDragColor(null);
-    if (!g.active) return false;
-    if (e) {
-      const target = document.elementFromPoint(e.clientX, e.clientY);
-      const slot = target?.closest<HTMLElement>("[data-swatch]");
-      if (slot) {
-        const index = Number(slot.dataset.swatch);
-        onLibraryChange((l) => ({
-          ...l,
-          palettes: l.palettes.map((p, i) =>
-            i === palette ? p.map((c, n) => (n === index ? g.hex : c)) : p,
-          ),
-        }));
-      } else if (target?.closest(".canvas-stage"))
-        commit({ ...draft.current, background: g.hex });
-    }
-    return true;
-  }
-  useEffect(
-    () => () => {
-      if (colorDrag.current?.timer) clearTimeout(colorDrag.current.timer);
-    },
-    [],
-  );
   function addPalette() {
     setPalette(library.palettes.length);
     setSwatch(0);
@@ -481,12 +375,29 @@ export default function DrawingCanvas({
     setCustomColor(color);
     setColorOpen(false);
   }
+  function swatchClick(i: number, c: string) {
+    if (i === swatch && !customColor) setColorOpen((v) => !v);
+    else {
+      setSwatch(i);
+      if (c) setCustomColor(null);
+      setColorOpen(!c);
+    }
+  }
+  function deletePalette() {
+    onLibraryChange((l) => ({
+      ...l,
+      palettes: l.palettes.filter((_, i) => i !== palette),
+    }));
+    setPalette(Math.max(0, Math.min(palette, library.palettes.length - 2)));
+    setCustomColor(color);
+    setColorOpen(false);
+  }
   function sizeGestureStart(e: ReactPointerEvent<HTMLButtonElement>, id: Tool) {
     if (e.button !== 0) return;
     ignoreToolClick.current = false;
     const timer =
       id === "erase"
-        ? setTimeout(() => {
+        ? window.setTimeout(() => {
             if (toolGesture.current) {
               toolGesture.current.changed = true;
               ignoreToolClick.current = true;
@@ -1070,34 +981,6 @@ export default function DrawingCanvas({
       );
     }
   }
-  const dragSelection = useRef<{
-    x: number;
-    y: number;
-    s: Selection;
-    resize: boolean;
-  } | null>(null);
-  function selectionDown(e: ReactPointerEvent, resize = false) {
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    if (selectionRef.current)
-      dragSelection.current = {
-        x: e.clientX,
-        y: e.clientY,
-        s: selectionRef.current,
-        resize,
-      };
-  }
-  function selectionMove(e: ReactPointerEvent) {
-    const drag = dragSelection.current;
-    if (!drag) return;
-    const dx = (e.clientX - drag.x) / (fit * zoom),
-      dy = (e.clientY - drag.y) / (fit * zoom);
-    const s = drag.s;
-    if (drag.resize) {
-      const scale = Math.max(0.1, 1 + Math.max(dx / s.width, dy / s.height));
-      setSelection({ ...s, width: s.width * scale, height: s.height * scale });
-    } else setSelection({ ...s, x: s.x + dx, y: s.y + dy });
-  }
   function deleteSelection() {
     const s = selectionRef.current;
     if (!s) return;
@@ -1149,7 +1032,7 @@ export default function DrawingCanvas({
     onLibraryChange((l) => ({ ...l, clips: [...l.clips, c] }));
     notify("Saved to Canvas Clips");
   }
-  function useClip(c: Clip) {
+  function insertClip(c: Clip) {
     setSelection({
       id: uid(),
       src: c.src,
@@ -1163,6 +1046,29 @@ export default function DrawingCanvas({
     });
     setPanel(null);
     setTool("cut");
+  }
+  function cutOutPhoto() {
+    if (!selection) return;
+    const id = selection.id;
+    void applySelection().then(() => {
+      photoCut.current = id;
+      setTool("cut");
+      notify("Draw around the part of the image you want to keep");
+    });
+  }
+  function bringToFront() {
+    if (!selection) return;
+    commit(
+      {
+        ...draft.current,
+        photos: [
+          ...draft.current.photos.filter((p) => p.id !== selection.id),
+          asPhoto(selection),
+        ],
+      },
+      selection.before || draft.current,
+    );
+    setSelection({ ...selection, before: draft.current });
   }
   useEffect(() => {
     const paste = (e: ClipboardEvent) => {
@@ -1285,13 +1191,13 @@ export default function DrawingCanvas({
           onClose={() => setRewind(null)}
         />
       )}
-      {dragColor && (
+      {colorDrag.dragColor && (
         <div
           className="drag-color"
           style={{
-            left: dragColor.x,
-            top: dragColor.y,
-            background: dragColor.hex,
+            left: colorDrag.dragColor.x,
+            top: colorDrag.dragColor.y,
+            background: colorDrag.dragColor.hex,
           }}
         />
       )}
@@ -1310,107 +1216,32 @@ export default function DrawingCanvas({
           }}
         />
       )}
-      {!library.settings.cleanCanvas && (
-        <header className="canvas-header">
-          <div>
-            <IconButton
-              label="Close canvas"
-              name="Canvas/Shell/close"
-              onClick={() => {
-                void applySelection().then(onClose);
-              }}
-            />
-          </div>
-          <div className="canvas-top-actions">
-            <button
-              className="canvas-pill"
-              aria-label="Convert to text"
-              onClick={() =>
-                void applySelection().then(() =>
-                  setTranscription(structuredClone(draft.current)),
-                )
-              }
-            >
-              <Icon name="Canvas/Shell/transcribe" />
-              <span>Convert to text</span>
-            </button>
-            <IconButton label="Add a note" onClick={onNote}>
-              <FileText size={19} />
-            </IconButton>
-            <button
-              className="canvas-pill"
-              aria-label="Export drawing"
-              onClick={() => void applySelection().then(onExport)}
-            >
-              <Download size={16} />
-              <span>Export</span>
-            </button>
-            <div
-              className="rewind-trigger"
-              onContextMenu={(e) => {
-                e.preventDefault();
-                sizeGestureEnd();
-                openRewind();
-              }}
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                ignoreToolClick.current = false;
-                toolGesture.current = {
-                  id: "draw",
-                  y: 0,
-                  size: "md",
-                  changed: false,
-                  timer: setTimeout(() => {
-                    ignoreToolClick.current = true;
-                    openRewind();
-                  }, 500),
-                };
-              }}
-              onPointerUp={sizeGestureEnd}
-              onPointerCancel={sizeGestureEnd}
-              onPointerLeave={sizeGestureEnd}
-            >
-              <IconButton
-                label="Undo"
-                name="Canvas/Shell/undo"
-                disabled={!history.undo.length && !selection}
-                onClick={() => {
-                  if (ignoreToolClick.current) {
-                    ignoreToolClick.current = false;
-                    return;
-                  }
-                  undo();
-                }}
-              />
-            </div>
-            <IconButton
-              label="Redo"
-              name="Canvas/Shell/redo"
-              disabled={!history.redo.length}
-              onClick={redo}
-            />
-            <IconButton
-              label="Canvas settings"
-              name="Shell/settings"
-              onClick={onSettings}
-            />
-          </div>
-        </header>
-      )}
-      {library.settings.cleanCanvas && (
-        <button
-          className="clean-exit"
-          aria-label="Show canvas controls"
-          onClick={() =>
-            onLibraryChange((l) => ({
-              ...l,
-              settings: { ...l.settings, cleanCanvas: false },
-            }))
-          }
-        >
-          <MoreHorizontal size={20} />
-        </button>
-      )}
+      <CanvasHeader
+        cleanCanvas={library.settings.cleanCanvas}
+        canUndo={!!history.undo.length || !!selection}
+        canRedo={!!history.redo.length}
+        toolGesture={toolGesture}
+        ignoreToolClick={ignoreToolClick}
+        onSizeGestureEnd={sizeGestureEnd}
+        onOpenRewind={() => openRewind()}
+        onUndo={undo}
+        onRedo={redo}
+        onClose={() => void applySelection().then(onClose)}
+        onTranscribe={() =>
+          void applySelection().then(() =>
+            setTranscription(structuredClone(draft.current)),
+          )
+        }
+        onNote={onNote}
+        onExport={() => void applySelection().then(onExport)}
+        onSettings={onSettings}
+        onShowControls={() =>
+          onLibraryChange((l) => ({
+            ...l,
+            settings: { ...l.settings, cleanCanvas: false },
+          }))
+        }
+      />
       <div
         className="canvas-stage"
         ref={stage}
@@ -1466,39 +1297,12 @@ export default function DrawingCanvas({
             onContextMenu={(e) => e.preventDefault()}
           />
           {selection && (
-            <div
-              className="floating-selection"
-              style={{
-                left: selection.x,
-                top: selection.y,
-                width: selection.width,
-                height: selection.height,
-                transform: "rotate(" + selection.rotation + "rad)",
-                borderWidth: 1.5 / (fit * zoom),
-              }}
-              onPointerDown={(e) => selectionDown(e)}
-              onPointerMove={selectionMove}
-              onPointerUp={() => {
-                dragSelection.current = null;
-              }}
-            >
-              <img
-                src={selection.src}
-                draggable={false}
-                alt="Selected artwork"
-              />
-              <button
-                className="resize-handle"
-                style={{ transform: "scale(" + 1 / (fit * zoom) + ")" }}
-                aria-label="Resize selection"
-                onPointerDown={(e) => selectionDown(e, true)}
-                onPointerMove={selectionMove}
-                onPointerUp={(e) => {
-                  e.stopPropagation();
-                  dragSelection.current = null;
-                }}
-              />
-            </div>
+            <SelectionOverlay
+              selection={selection}
+              fit={fit}
+              zoom={zoom}
+              onUpdate={setSelection}
+            />
           )}
           {picker && cursor && (
             <div
@@ -1526,76 +1330,21 @@ export default function DrawingCanvas({
         </div>
       )}
       {selection && (
-        <div className="selection-actions">
-          <IconButton
-            label="Apply selection"
-            onClick={() => void applySelection()}
-          >
-            <Check size={20} />
-          </IconButton>
-          <IconButton
-            label="Duplicate selection"
-            onClick={() => void duplicateSelection()}
-          >
-            <Copy size={18} />
-          </IconButton>
-          <IconButton label="Save selection as clip" onClick={clipSelection}>
-            <Clipboard size={18} />
-          </IconButton>
-          <IconButton
-            label="Rotate selection"
-            onClick={() =>
-              setSelection((s) =>
-                s ? { ...s, rotation: s.rotation + Math.PI / 12 } : s,
-              )
-            }
-          >
-            <RotateCw size={18} />
-          </IconButton>
-          {selection.kind === "photo" && (
-            <IconButton
-              label="Cut out image"
-              onClick={() => {
-                const id = selection.id;
-                void applySelection().then(() => {
-                  photoCut.current = id;
-                  setTool("cut");
-                  notify("Draw around the part of the image you want to keep");
-                });
-              }}
-            >
-              <Scissors size={18} />
-            </IconButton>
-          )}
-          {selection.kind === "photo" && (
-            <IconButton
-              label="Bring image to front"
-              onClick={() => {
-                commit(
-                  {
-                    ...draft.current,
-                    photos: [
-                      ...draft.current.photos.filter(
-                        (p) => p.id !== selection.id,
-                      ),
-                      asPhoto(selection),
-                    ],
-                  },
-                  selection.before || draft.current,
-                );
-                setSelection({ ...selection, before: draft.current });
-              }}
-            >
-              ↑
-            </IconButton>
-          )}
-          <IconButton label="Delete selection" onClick={deleteSelection}>
-            <Trash2 size={18} />
-          </IconButton>
-          <IconButton label="Cancel selection" onClick={cancelSelection}>
-            <X size={18} />
-          </IconButton>
-        </div>
+        <SelectionActions
+          kind={selection.kind}
+          onApply={() => void applySelection()}
+          onDuplicate={() => void duplicateSelection()}
+          onClip={clipSelection}
+          onRotate={() =>
+            setSelection((s) =>
+              s ? { ...s, rotation: s.rotation + Math.PI / 12 } : s,
+            )
+          }
+          onCutOut={cutOutPhoto}
+          onBringToFront={bringToFront}
+          onDelete={deleteSelection}
+          onCancel={cancelSelection}
+        />
       )}
       {!library.settings.cleanCanvas && (
         <div className="canvas-page-navigation">
@@ -1720,257 +1469,36 @@ export default function DrawingCanvas({
             ))}
           </div>
         )}
-        <div className="palette-row">
-          <IconButton
-            label="Add palette"
-            name="Canvas/Tray/add-palette"
-            onClick={addPalette}
-          />
-          <div
-            className="palettes"
-            aria-label="Color palettes"
-            onPointerDown={(e) => {
-              paletteSwipe.current = { x: e.clientX, y: e.clientY };
-              ignorePaletteClick.current = false;
-            }}
-            onPointerMove={(e) => {
-              if (colorDrag.current?.active) return;
-              const g = paletteSwipe.current;
-              if (!g) return;
-              const dx = e.clientX - g.x,
-                dy = e.clientY - g.y;
-              if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) {
-                changePalette(dx < 0 ? 1 : -1);
-                paletteSwipe.current = null;
-                ignorePaletteClick.current = true;
-                e.preventDefault();
-              }
-            }}
-            onPointerUp={() => {
-              paletteSwipe.current = null;
-            }}
-            onPointerCancel={() => {
-              paletteSwipe.current = null;
-            }}
-            onClickCapture={(e) => {
-              if (ignorePaletteClick.current) {
-                e.preventDefault();
-                e.stopPropagation();
-                ignorePaletteClick.current = false;
-              }
-            }}
-          >
-            <button
-              className="palette-arrow"
-              aria-label="Previous palette"
-              disabled={palette === 0}
-              onClick={() => changePalette(-1)}
-            >
-              <ChevronLeft size={13} />
-            </button>
-            <div className="swatches">
-              {library.palettes[palette].map((c, i) => (
-                <button
-                  key={i}
-                  aria-label={"Color swatch " + (i + 1)}
-                  title={c || "Empty color"}
-                  draggable={false}
-                  onPointerDown={(e) => startColorDrag(e, c)}
-                  onPointerMove={(e) => moveColorDrag(e, true)}
-                  onPointerUp={(e) => endColorDrag(e)}
-                  onPointerCancel={() => endColorDrag()}
-                  className={
-                    "swatch " + (i === swatch && !customColor ? "selected" : "")
-                  }
-                  style={{ background: c || "transparent" }}
-                  data-empty={!c}
-                  data-swatch={i}
-                  onClick={() => {
-                    if (i === swatch && !customColor) setColorOpen((v) => !v);
-                    else {
-                      setSwatch(i);
-                      if (c) setCustomColor(null);
-                      setColorOpen(!c);
-                    }
-                  }}
-                />
-              ))}
-            </div>
-            <button
-              className="palette-arrow"
-              aria-label="Next palette"
-              onClick={() => changePalette(1)}
-            >
-              <ChevronRight size={13} />
-            </button>
-          </div>
-          <IconButton
-            label="Delete palette"
-            name="Canvas/Tray/delete-palette"
-            disabled={library.palettes.length === 1}
-            onClick={() => {
-              onLibraryChange((l) => ({
-                ...l,
-                palettes: l.palettes.filter((_, i) => i !== palette),
-              }));
-              setPalette(
-                Math.max(0, Math.min(palette, library.palettes.length - 2)),
-              );
-              setCustomColor(color);
-              setColorOpen(false);
-            }}
-          />
-          <IconButton label="Canvas Clips" onClick={() => setPanel("clips")}>
-            <Icon name="Canvas/Tray/add-clip" />
-          </IconButton>
-          <IconButton
-            label="Hide tool tray"
-            name="Canvas/Shell/show-tool-tray"
-            onClick={() => setTrayVisible(false)}
-          />
-        </div>
-        <div className="tools-scroll" ref={trayScroll}>
-          <div className="tools-row">
-            {tools.slice(0, 10).map((t) => (
-              <button
-                key={t.id}
-                aria-label={t.label}
-                aria-pressed={tool === t.id}
-                title={t.label + (t.key ? " (" + t.key + ")" : "")}
-                className={
-                  "drawing-tool tool-" +
-                  t.id +
-                  " " +
-                  (tool === t.id ? "selected" : "")
-                }
-                onPointerDown={
-                  t.sized ? (e) => sizeGestureStart(e, t.id) : undefined
-                }
-                onPointerMove={t.sized ? sizeGestureMove : undefined}
-                onPointerUp={t.sized ? sizeGestureEnd : undefined}
-                onPointerCancel={t.sized ? sizeGestureEnd : undefined}
-                onClick={() => {
-                  if (ignoreToolClick.current) {
-                    ignoreToolClick.current = false;
-                    return;
-                  }
-                  chooseTool(t.id);
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (t.id === "erase") setPanel("erase");
-                }}
-              >
-                <img
-                  draggable={false}
-                  alt=""
-                  src={asset(
-                    "Canvas/Tray/" +
-                      t.id +
-                      "-" +
-                      (tool === t.id ? "selected" : "unselected") +
-                      (t.sized ? "-" + (sizes[t.id] || "md") : ""),
-                  )}
-                />
-                <span className="tool-tooltip">{t.label}</span>
-              </button>
-            ))}
-            <button
-              className="color-mixer"
-              aria-label="Color mixer"
-              title="Stir to mix colors"
-              onPointerDown={(e) => {
-                startColorDrag(e, mixedColor.current, 500);
-                const r = e.currentTarget.getBoundingClientRect();
-                mixer.current = {
-                  angle: Math.atan2(
-                    e.clientY - r.top - r.height / 2,
-                    e.clientX - r.left - r.width / 2,
-                  ),
-                  amount: 0,
-                  from: mixedColor.current,
-                  to: color,
-                };
-                e.currentTarget.setPointerCapture(e.pointerId);
-              }}
-              onPointerMove={(e) => {
-                if (moveColorDrag(e)) return;
-                const m = mixer.current;
-                if (!m) return;
-                const r = e.currentTarget.getBoundingClientRect(),
-                  a = Math.atan2(
-                    e.clientY - r.top - r.height / 2,
-                    e.clientX - r.left - r.width / 2,
-                  );
-                let delta = a - m.angle;
-                if (delta > Math.PI) delta -= 2 * Math.PI;
-                if (delta < -Math.PI) delta += 2 * Math.PI;
-                m.amount = Math.max(
-                  0,
-                  Math.min(1, m.amount + delta / (Math.PI * 2)),
-                );
-                m.angle = a;
-                const c = mixColors(m.from, m.to, m.amount);
-                setCustomColor(c);
-                mixedColor.current = c;
-              }}
-              onPointerCancel={() => {
-                endColorDrag();
-                mixer.current = null;
-              }}
-              onPointerUp={(e) => {
-                if (endColorDrag(e)) {
-                  mixer.current = null;
-                  return;
-                }
-                if (mixer.current && mixer.current.amount < 0.01)
-                  setColorOpen((v) => !v);
-                mixer.current = null;
-              }}
-            >
-              <span className="mixer-rim">
-                <span
-                  style={{
-                    background:
-                      "conic-gradient(" +
-                      color +
-                      " 0deg 205deg, " +
-                      mixedColor.current +
-                      " 210deg 355deg, " +
-                      color +
-                      " 360deg)",
-                  }}
-                />
-              </span>
-            </button>
-            {tools.slice(10).map((t) => (
-              <button
-                key={t.id}
-                aria-label={t.label}
-                title={t.label}
-                className={
-                  "drawing-tool tool-" +
-                  t.id +
-                  " " +
-                  (tool === t.id ? "selected" : "")
-                }
-                onClick={() => chooseTool(t.id)}
-              >
-                <img
-                  draggable={false}
-                  alt=""
-                  src={asset(
-                    "Canvas/Tray/" +
-                      t.id +
-                      "-" +
-                      (tool === t.id ? "selected" : "unselected"),
-                  )}
-                />
-                <span className="tool-tooltip">{t.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <PaletteRow
+          palettes={library.palettes}
+          palette={palette}
+          swatch={swatch}
+          customColor={customColor}
+          colorDrag={colorDrag}
+          onAddPalette={addPalette}
+          onChangePalette={changePalette}
+          onSwatchClick={swatchClick}
+          onDeletePalette={deletePalette}
+          onOpenClips={() => setPanel("clips")}
+          onHideTray={() => setTrayVisible(false)}
+        />
+        <ToolRow
+          tool={tool}
+          sizes={sizes}
+          color={color}
+          mixedColor={mixedColor}
+          colorDrag={colorDrag}
+          sizeGesture={{
+            start: sizeGestureStart,
+            move: sizeGestureMove,
+            end: sizeGestureEnd,
+            ignoreClick: ignoreToolClick,
+          }}
+          onChooseTool={chooseTool}
+          onErasePanel={() => setPanel("erase")}
+          onMixColor={setCustomColor}
+          onToggleColorOpen={() => setColorOpen((v) => !v)}
+        />
         <div
           className="tray-grip"
           onPointerDown={(e) => {
@@ -1996,79 +1524,27 @@ export default function DrawingCanvas({
           }}
           onClick={() => setTrayVisible(true)}
         >
-          <Icon name="Canvas/Shell/show-tool-tray" />
+          <Icon name="canvas-shell-show-tool-tray" />
         </button>
       )}
-      {panel === "clips" && (
-        <Modal title="Canvas Clips" onClose={() => setPanel(null)}>
-          {library.clips.length ? (
-            <div className="clip-grid">
-              {library.clips.map((c) => (
-                <div key={c.id}>
-                  <button
-                    aria-label="Use saved clip"
-                    onClick={() => useClip(c)}
-                  >
-                    <img src={c.src} alt="Saved artwork" />
-                  </button>
-                  <button
-                    aria-label="Delete saved clip"
-                    onClick={() =>
-                      onLibraryChange((l) => ({
-                        ...l,
-                        clips: l.clips.filter((x) => x.id !== c.id),
-                      }))
-                    }
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-panel">
-              <Scissors size={35} />
-              <h3>Keep a little inspiration.</h3>
-              <p>Cut out part of a drawing, then save it here to use again.</p>
-              <button
-                className="primary-button"
-                onClick={() => {
-                  setTool("cut");
-                  setPanel(null);
-                }}
-              >
-                Choose the Cut tool
-              </button>
-            </div>
-          )}
-        </Modal>
-      )}
-      {panel === "collage" && (
-        <Modal title="Bring it all together" onClose={() => setPanel(null)}>
-          <button className="menu-row" onClick={() => file.current?.click()}>
-            <Icon name="Canvas/Tray/collage-photos" />
-            <span>
-              Add photos<small>Choose one image or a whole collection</small>
-            </span>
-          </button>
-          <button
-            className="menu-row"
-            onClick={() => {
-              setPanel("clips");
-            }}
-          >
-            <Clipboard size={22} />
-            <span>Use a Canvas Clip</span>
-          </button>
-          <p className="muted">
-            You can also drop images directly onto your page. Tap an image with
-            the Collage tool to move, resize, or rotate it.
-          </p>
-        </Modal>
-      )}
-      {panel === "erase" && (
-        <Modal title="A fresh start" onClose={() => setPanel(null)}>
-          {[
+      {(panel === "clips" || panel === "collage" || panel === "erase") && (
+        <PanelModals
+          panel={panel}
+          clips={library.clips}
+          onUseClip={insertClip}
+          onDeleteClip={(id) =>
+            onLibraryChange((l) => ({
+              ...l,
+              clips: l.clips.filter((x) => x.id !== id),
+            }))
+          }
+          onChooseCut={() => {
+            setTool("cut");
+            setPanel(null);
+          }}
+          onAddPhotos={() => file.current?.click()}
+          onOpenClips={() => setPanel("clips")}
+          eraseActions={[
             {
               label: "Clear ink",
               action: () => {
@@ -2085,21 +1561,9 @@ export default function DrawingCanvas({
               label: "Clear images",
               action: () => commit({ ...draft.current, photos: [] }),
             },
-          ].map((a) => (
-            <button
-              key={a.label}
-              className="menu-row"
-              onClick={() => {
-                a.action();
-                setPanel(null);
-              }}
-            >
-              <Trash2 size={19} />
-              <span>{a.label}</span>
-            </button>
-          ))}
-          <p className="muted">You can undo any of these changes.</p>
-        </Modal>
+          ]}
+          onClose={() => setPanel(null)}
+        />
       )}
       {problem && (
         <div className="error-banner" role="alert">

@@ -203,7 +203,7 @@ export default function JournalCustomizer({
                 aria-pressed={journal.template === n}
                 onClick={() => onChange({ ...journal, template: n })}
               >
-                <img src={asset("Journal/Templates/Thumbnails/" + n)} alt="" />
+                <img src={asset("journal-templates-thumbnails-" + n)} alt="" />
                 <span>{n.replaceAll("-", " ")}</span>
               </button>
             ))}

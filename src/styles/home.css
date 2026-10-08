@@ -1,0 +1,293 @@
+/* The peel acts on a closed journal on the shelf, so it uses the book box. */
+.page-crumple.peel {
+  top: 52%;
+  width: clamp(194px, 26.7vw, 365px);
+  height: clamp(292px, 40vw, 547px);
+}
+.book-lock {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #23283066;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 3;
+}
+.action-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 28;
+}
+.action-strip .icon-button {
+  background: #f8f7f3;
+  width: 33px;
+  height: 33px;
+  color: #777e8f;
+  box-shadow: 0 1px 2px #35405815;
+}
+.action-strip .icon-button .native-icon {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) opacity(0.5);
+}
+.action-strip .icon-button:hover:not(:disabled) {
+  background: white;
+  transform: translateY(-2px);
+}
+.home-actions {
+  position: absolute;
+  top: calc(52% + min(20vw, 274px) + 87px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.journal-dots {
+  position: absolute;
+  top: calc(52% + min(20vw, 274px) + 151px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.journal-dots button {
+  width: 5px;
+  height: 5px;
+  padding: 0;
+  background: #ffffff45;
+  border-radius: 50%;
+}
+.journal-dots .current {
+  background: #ffffffe0;
+  transform: scale(1.2);
+}
+.shelf-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 25;
+  width: 38px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffffad;
+  opacity: 0;
+  transition:
+    opacity 0.2s,
+    background 0.2s;
+  border-radius: 8px;
+}
+.home-scene:hover .shelf-arrow,
+.pages-scene:hover .shelf-arrow {
+  opacity: 1;
+}
+.shelf-arrow:hover {
+  background: #ffffff14;
+}
+.shelf-left {
+  left: 35px;
+}
+.shelf-right {
+  right: 35px;
+}
+.shelf-arrow:disabled {
+  opacity: 0 !important;
+}
+.empty-book {
+  position: absolute;
+  width: 225px;
+  height: 335px;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  border: 1px dashed #ffffff6b;
+  border-radius: 8px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  pointer-events: auto;
+}
+.pages-scene .journal-heading {
+  top: 12%;
+}
+.butterfly-stack {
+  position: absolute;
+  inset: 0;
+  perspective: 1600px;
+  touch-action: pan-y;
+}
+.spread-page {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(60vw, 760px);
+  aspect-ratio: 1.334;
+  padding: 0;
+  background: #f8f7f2;
+  border-radius: 7px;
+  transform: translate(calc(-50% + var(--offset) * 36px), -50%)
+    rotateY(calc(var(--offset) * -7deg)) scale(calc(1 - var(--abs) * 0.035));
+  box-shadow:
+    0 1px 2px #34425c22,
+    0 3px 4px #2a36593a;
+  transition: transform 0.55s cubic-bezier(0.2, 0.75, 0.2, 1);
+  overflow: hidden;
+}
+.spread-page.current {
+  transform: translate(-50%, -50%) rotateY(0deg);
+  box-shadow:
+    0 38px 20px -22px #27375640,
+    0 4px 6px #38415442;
+}
+.page-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  border-radius: inherit;
+}
+.page-preview > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.preview-note {
+  position: absolute;
+  top: 9%;
+  right: 7%;
+  width: 26%;
+  max-height: 66%;
+  overflow: hidden;
+  padding: 5%;
+  color: #566264;
+  background: #fffdf2;
+  font-size: clamp(7px, 1vw, 12px);
+  line-height: 1.6;
+  box-shadow: 0 4px 12px #202d3b18;
+  text-align: left;
+  transform: rotate(1deg);
+}
+.preview-note.note-full {
+  left: 12%;
+  right: 12%;
+  width: 76%;
+  top: 15%;
+  height: 70%;
+  padding: 7%;
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+  font-size: clamp(9px, 1.4vw, 20px);
+}
+.blank-spread {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(60vw, 760px);
+  aspect-ratio: 1.334;
+  background: #f8f7f2;
+  color: #818687;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+.pages-actions {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.spread-count {
+  position: absolute;
+  top: calc(50% + min(22.5vw, 285px) + 19px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.grid-scene .journal-heading {
+  top: 11%;
+}
+.page-grid {
+  position: absolute;
+  top: 7%;
+  bottom: 2%;
+  left: 8%;
+  right: 8%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 29px 28px;
+  overflow: auto;
+  align-content: start;
+  padding: 0 0 20px;
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff38 transparent;
+}
+.grid-page {
+  position: relative;
+  padding: 0;
+  aspect-ratio: 1.334;
+  border-radius: 5px;
+  box-shadow: 0 8px 13px #3c405a26;
+  transition: transform 0.2s;
+  min-width: 0;
+}
+.grid-page:hover {
+  transform: translateY(-4px);
+}
+.grid-page.chosen {
+  outline: 3px solid #fff;
+  outline-offset: 5px;
+}
+.page-number {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-size: 11px;
+  opacity: 0.55;
+}
+.selection-check {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 22px;
+  height: 22px;
+  background: #fff9;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  color: #4a6f79;
+}
+.chosen .selection-check {
+  background: #345e62;
+  color: #fff;
+}
+.grid-add {
+  border: 1px solid #ffffff48;
+  border-radius: 6px;
+  aspect-ratio: 1.334;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+.grid-add:hover {
+  background: #ffffff10;
+  opacity: 1;
+}

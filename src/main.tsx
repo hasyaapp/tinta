@@ -6,7 +6,12 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/fraunces/500.css";
 import "@fontsource/fraunces/700.css";
-import "./styles.css";
+import "./styles/base.css";
+import "./styles/home.css";
+import "./styles/canvas.css";
+import "./styles/panels.css";
+import "./styles/customize.css";
+import "./styles/gestures.css";
 import "./book.css";
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

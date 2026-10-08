@@ -1,30 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Check,
-  Download,
-  FileText,
-  HelpCircle,
-  ImagePlus,
-  LockKeyhole,
-  Search,
-  Trash2,
-  Upload,
-  X,
-} from "lucide-react";
+import { Check, X } from "lucide-react";
 import type { Journal, Library, Page } from "./lib/model";
 import {
-  asset,
-  coverNames,
-  duplicatePage,
   movePages,
   newJournal,
   newPage,
-  paletteDefaults,
   pinHash,
   seedLibrary,
   uid,
   validateBackup,
 } from "./lib/model";
+import {
+  duplicateJournalIn,
+  duplicatePagesIn,
+  insertJournal,
+  insertPageAt,
+  moveJournal,
+  removeJournal,
+  removePages,
+  reorderPageIds,
+} from "./lib/library";
 import { loadLibrary, saveLibrary } from "./lib/storage";
 import {
   composePage,
@@ -34,11 +29,21 @@ import {
   toBlob,
 } from "./lib/images";
 import { Home, Pages } from "./components/LibraryViews";
-import { Icon, IconButton, Modal, Toggle } from "./components/UI";
+import { IconButton } from "./components/UI";
 import DrawingCanvas from "./components/DrawingCanvas";
 import PageCrumple from "./components/PageCrumple";
 import JournalTransition, { COVER_DURATION } from "./components/JournalBook";
 import JournalCustomizer from "./components/JournalCustomizer";
+import SettingsDialog from "./components/dialogs/SettingsDialog";
+import SearchDialog from "./components/dialogs/SearchDialog";
+import HelpDialog from "./components/dialogs/HelpDialog";
+import NoteDialog from "./components/dialogs/NoteDialog";
+import MoveDialog from "./components/dialogs/MoveDialog";
+import ExportDialog from "./components/dialogs/ExportDialog";
+import JournalMenuDialog from "./components/dialogs/JournalMenuDialog";
+import PageMenuDialog from "./components/dialogs/PageMenuDialog";
+import PinDialog from "./components/dialogs/PinDialog";
+import ConfirmDialog from "./components/dialogs/ConfirmDialog";
 
 type View = "home" | "butterfly" | "grid" | "canvas";
 type Dialog =
@@ -55,60 +60,6 @@ type Dialog =
   | "help"
   | "lock"
   | "unlock";
-// Row of the "Your Journals" sheet. Matches the native list: cover, title,
-// page count, modified time, and the order controls. A trailing drag handle is
-// not faked because reordering here is done with the two arrow buttons.
-function JournalRow({
-  journal,
-  index,
-  total,
-  onOpen,
-  onMove,
-}: {
-  journal: Journal;
-  index: number;
-  total: number;
-  onOpen: () => void;
-  onMove: (dir: -1 | 1) => void;
-}) {
-  const pages = journal.pageIds.length;
-  const minutes =
-    typeof journal.updatedAt === "number"
-      ? Math.max(0, Math.round((Date.now() - journal.updatedAt) / 60000))
-      : null;
-  return (
-    <div className="journal-list-item">
-      <button onClick={onOpen}>
-        <img src={journal.cover} alt="" />
-        <span>
-          <strong>{journal.title}</strong>
-          <small>
-            {pages} {pages === 1 ? "Page" : "Pages"}
-            {minutes !== null
-              ? " / " + (minutes < 1 ? "1m" : minutes + "m")
-              : ""}
-          </small>
-        </span>
-      </button>
-      <div className="reorder-buttons">
-        <button
-          aria-label={"Move " + journal.title + " up"}
-          disabled={index === 0}
-          onClick={() => onMove(-1)}
-        >
-          ↑
-        </button>
-        <button
-          aria-label={"Move " + journal.title + " down"}
-          disabled={index === total - 1}
-          onClick={() => onMove(1)}
-        >
-          ↓
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const [lib, setLib] = useState<Library | null>(null),
@@ -118,10 +69,7 @@ export default function App() {
     [saved, setSaved] = useState("Loading journals…"),
     [error, setError] = useState(""),
     [fatal, setFatal] = useState(false),
-    [busy, setBusy] = useState(false),
-    [query, setQuery] = useState(""),
-    [pin, setPin] = useState(""),
-    [pinError, setPinError] = useState("");
+    [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<{
       title: string;
       message: string;
@@ -212,8 +160,6 @@ export default function App() {
   const withAccess = (action: () => void) => {
     if (journal?.lock && !unlocked.current.has(journal.id)) {
       afterUnlock.current = action;
-      setPin("");
-      setPinError("");
       setDialog("unlock");
     } else action();
   };
@@ -331,12 +277,7 @@ export default function App() {
     const j = newJournal();
     const p = newPage();
     j.pageIds = [p.id];
-    update((l) => {
-      const at = l.journals.length ? l.selected + 1 : 0;
-      const journals = [...l.journals];
-      journals.splice(at, 0, j);
-      return { ...l, journals, pages: { ...l.pages, [p.id]: p }, selected: at };
-    });
+    update((l) => insertJournal(l, j, p));
     setIndex(0);
     setView("home");
     setDialog("customize");
@@ -345,42 +286,14 @@ export default function App() {
     if (!journal) return;
     const p = newPage(journal.template);
     const at = view === "grid" ? journal.pageIds.length : index + 1;
-    update((l) => ({
-      ...l,
-      pages: { ...l.pages, [p.id]: p },
-      journals: l.journals.map((j) =>
-        j.id === journal.id
-          ? {
-              ...j,
-              pageIds: [
-                ...j.pageIds.slice(0, at),
-                p.id,
-                ...j.pageIds.slice(at),
-              ],
-              lastPage: at,
-            }
-          : j,
-      ),
-    }));
+    update((l) => insertPageAt(l, journal.id, p, at));
     setIndex(Math.min(at, journal.pageIds.length));
     if (open) setView("canvas");
   };
   const deletePages = (ids: string[]) => {
     const apply = () => {
       setMeshPreparing(false);
-      update((l) => {
-        const pages = { ...l.pages };
-        ids.forEach((id) => delete pages[id]);
-        return {
-          ...l,
-          pages,
-          journals: l.journals.map((j) => ({
-            ...j,
-            pageIds: j.pageIds.filter((id) => !ids.includes(id)),
-            lastPage: 0,
-          })),
-        };
-      });
+      update((l) => removePages(l, ids));
       setIndex((i) =>
         Math.max(
           0,
@@ -421,25 +334,7 @@ export default function App() {
   };
   const duplicatePages = (ids: string[]) => {
     if (!journal) return;
-    update((l) => {
-      const pages = { ...l.pages },
-        next: string[] = [];
-      for (const id of journal.pageIds) {
-        next.push(id);
-        if (ids.includes(id)) {
-          const p = duplicatePage(l.pages[id]);
-          pages[p.id] = p;
-          next.push(p.id);
-        }
-      }
-      return {
-        ...l,
-        pages,
-        journals: l.journals.map((j) =>
-          j.id === journal.id ? { ...j, pageIds: next } : j,
-        ),
-      };
-    });
+    update((l) => duplicatePagesIn(l, journal.id, ids));
     setDialog(null);
     notify("Page duplicated");
   };
@@ -525,35 +420,32 @@ export default function App() {
         )}
       </main>
     );
-  const journalEntries = lib.journals.map((j, i) => ({ j, i }));
-  const needle = query.trim().toLowerCase();
-  const matches = needle
-    ? journalEntries.filter(({ j }) => j.title.toLowerCase().includes(needle))
-    : journalEntries;
-  const recent = needle
-    ? []
-    : [...journalEntries]
-        .filter(({ j }) => typeof j.updatedAt === "number")
-        .sort((a, b) => (b.j.updatedAt ?? 0) - (a.j.updatedAt ?? 0))
-        .slice(0, 3);
   const openFromList = (i: number) => {
     select(i);
     setView("home");
     setDialog(null);
   };
-  const moveJournal = (i: number, dir: -1 | 1) =>
-    update((l) => {
-      const target = i + dir;
-      if (target < 0 || target >= l.journals.length) return l;
-      const journals = [...l.journals];
-      [journals[target], journals[i]] = [journals[i], journals[target]];
-      return {
-        ...l,
-        journals,
-        selected: journals.findIndex(
-          (x) => x.id === l.journals[l.selected]?.id,
-        ),
-      };
+  const rotatePage = (p: Page) =>
+    run(async () => {
+      const c = await composePage(p, true, lib.templates);
+      const rotated = document.createElement("canvas");
+      rotated.width = c.height;
+      rotated.height = c.width;
+      const ctx = rotated.getContext("2d")!;
+      ctx.translate(rotated.width, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(c, 0, 0);
+      updatePage({
+        ...p,
+        width: rotated.width,
+        height: rotated.height,
+        ink: rotated.toDataURL(),
+        fill: "",
+        photos: [],
+        template: "",
+        thumbnail: "",
+      });
+      setDialog(null);
     });
   return (
     <main
@@ -573,18 +465,18 @@ export default function App() {
               <>
                 <IconButton
                   label="Back to journals"
-                  name="Shell/journal-mode-on"
+                  name="shell-journal-mode-on"
                   onClick={back}
                 />
                 <IconButton
                   label="Butterfly view"
-                  name="Shell/journal-mode-on"
+                  name="shell-journal-mode-on"
                   active={view === "butterfly"}
                   onClick={() => setView("butterfly")}
                 />
                 <IconButton
                   label="Grid view"
-                  name="Shell/grid-mode-on"
+                  name="shell-grid-mode-on"
                   active={view === "grid"}
                   onClick={() => setView("grid")}
                 />
@@ -603,15 +495,12 @@ export default function App() {
             </span>
             <IconButton
               label="Search journals"
-              name="Shell/journal-search"
-              onClick={() => {
-                setQuery("");
-                setDialog("search");
-              }}
+              name="shell-journal-search"
+              onClick={() => setDialog("search")}
             />
             <IconButton
               label="Settings"
-              name="Shell/settings"
+              name="shell-settings"
               onClick={() => setDialog("settings")}
             />
           </div>
@@ -633,22 +522,7 @@ export default function App() {
                   "All pages in this journal will be removed. This cannot be undone.",
                 action: () => {
                   const remove = () =>
-                    update((l) => {
-                      const pages = { ...l.pages };
-                      journal!.pageIds.forEach((id) => delete pages[id]);
-                      const journals = l.journals.filter(
-                        (j) => j.id !== journal!.id,
-                      );
-                      return {
-                        ...l,
-                        pages,
-                        journals,
-                        selected: Math.max(
-                          0,
-                          Math.min(l.selected, journals.length - 1),
-                        ),
-                      };
-                    });
+                    update((l) => removeJournal(l, journal!.id));
                   if (reducedMotion() || !journal) {
                     remove();
                     return;
@@ -679,17 +553,7 @@ export default function App() {
             setDialog("note");
           }}
           onReorder={(from, to) =>
-            changeJournal((j) => {
-              if (
-                from === to ||
-                !j.pageIds.includes(from) ||
-                !j.pageIds.includes(to)
-              )
-                return j;
-              const ids = j.pageIds.filter((id) => id !== from);
-              ids.splice(ids.indexOf(to), 0, from);
-              return { ...j, pageIds: ids };
-            })
+            changeJournal((j) => reorderPageIds(j, from, to))
           }
           onBatch={batch}
         />
@@ -714,146 +578,23 @@ export default function App() {
         />
       )}
       {dialog === "settings" && (
-        <Modal title="Settings" onClose={() => setDialog(null)}>
-          <section className="settings-section">
-            <span className="section-label">CANVAS</span>
-            {(
-              [
-                [
-                  "fingerDraw",
-                  "Draw with your finger",
-                  "Use touch to draw, or switch off for Pencil only.",
-                ],
-                [
-                  "cleanCanvas",
-                  "Clean Canvas Mode",
-                  "Hide canvas buttons while you draw.",
-                ],
-                [
-                  "showGrid",
-                  "Show Grid While Zooming",
-                  "A little guidance for the finer details.",
-                ],
-                [
-                  "exportBackground",
-                  "Export with Background Color",
-                  "Include the page color in PNG and PDF exports.",
-                ],
-              ] as const
-            ).map(([key, label, detail]) => (
-              <Toggle
-                key={key}
-                label={label}
-                detail={detail}
-                value={lib.settings[key]}
-                onChange={(v) =>
-                  update((l) => ({
-                    ...l,
-                    settings: { ...l.settings, [key]: v },
-                  }))
-                }
-              />
-            ))}
-          </section>
-          <section className="settings-section">
-            <span className="section-label">COLORS</span>
-            <button
-              className="menu-row"
-              onClick={() => {
-                update((l) => ({
-                  ...l,
-                  palettes: [
-                    ...paletteDefaults.slice(0, 5).map((p) => [...p]),
-                    ...l.palettes.slice(5),
-                  ],
-                }));
-                notify("Default palettes restored");
-              }}
-            >
-              <Icon name="Canvas/Tray/add-palette" />
-              <span>
-                Reset default palettes
-                <small>
-                  Restore the first five palettes and keep your custom palettes
-                </small>
-              </span>
-            </button>
-          </section>
-          <section className="settings-section">
-            <span className="section-label">YOUR JOURNALS</span>
-            <button className="menu-row" onClick={backup}>
-              <Download size={19} />
-              <span>
-                Export a backup
-                <small>All journals, drawings, notes, and palettes</small>
-              </span>
-            </button>
-            <button
-              className="menu-row"
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload size={19} />
-              <span>Restore a backup</span>
-            </button>
-            <button className="menu-row" onClick={() => setDialog("help")}>
-              <HelpCircle size={19} />
-              <span>How to use Tinta</span>
-            </button>
-          </section>
-          <p className="settings-footnote">
-            Your work stays on this device. Keep a backup of the things you
-            love.
-          </p>
-        </Modal>
+        <SettingsDialog
+          settings={lib.settings}
+          update={update}
+          notify={notify}
+          onBackup={backup}
+          onRestoreClick={() => fileRef.current?.click()}
+          onHelp={() => setDialog("help")}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "search" && (
-        <Modal title="Your Journals" onClose={() => setDialog(null)}>
-          <div className="search-field">
-            <Search size={19} />
-            <input
-              autoFocus
-              placeholder="Title Search"
-              aria-label="Search journals by title"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <div className="journal-list">
-            {!needle && recent.length > 0 && (
-              <>
-                <h3 className="journal-list-group">Last Edited</h3>
-                {recent.map(({ j, i }) => (
-                  <JournalRow
-                    key={j.id}
-                    journal={j}
-                    index={i}
-                    total={lib.journals.length}
-                    onOpen={() => openFromList(i)}
-                    onMove={(dir) => moveJournal(i, dir)}
-                  />
-                ))}
-              </>
-            )}
-            <h3 className="journal-list-group">
-              Local ({lib.journals.length})
-            </h3>
-            {matches.length === 0 && (
-              <p className="journal-list-empty">
-                No journal matches that title.
-              </p>
-            )}
-            {matches.map(({ j, i }) => (
-              <JournalRow
-                key={j.id}
-                journal={j}
-                index={i}
-                total={lib.journals.length}
-                onOpen={() => openFromList(i)}
-                onMove={(dir) => moveJournal(i, dir)}
-              />
-            ))}
-          </div>
-        </Modal>
+        <SearchDialog
+          journals={lib.journals}
+          onOpen={openFromList}
+          onMove={(i, dir) => update((l) => moveJournal(l, i, dir))}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "customize" && journal && (
         <JournalCustomizer
@@ -865,382 +606,137 @@ export default function App() {
         />
       )}
       {dialog === "journal-menu" && journal && (
-        <Modal title={journal.title} onClose={() => setDialog(null)}>
-          <button
-            className="menu-row"
-            onClick={() => {
-              update((l) => {
-                const j = {
-                  ...structuredClone(journal),
-                  id: uid(),
-                  title: journal.title + " Copy",
-                  pageIds: [] as string[],
-                  lock: undefined,
-                };
-                const pages = { ...l.pages };
-                for (const id of journal.pageIds) {
-                  const p = duplicatePage(l.pages[id]);
-                  pages[p.id] = p;
-                  j.pageIds.push(p.id);
-                }
-                const journals = [...l.journals];
-                journals.splice(l.selected + 1, 0, j);
-                return { ...l, journals, pages, selected: l.selected + 1 };
-              });
-              setDialog(null);
-              notify("Journal duplicated");
-            }}
-          >
-            <Icon name="Shell/Control Strip/duplicate" />
-            <span>Duplicate journal</span>
-          </button>
-          <button
-            className="menu-row"
-            onClick={() => {
-              setPin("");
-              setPinError("");
-              setDialog("lock");
-            }}
-          >
-            <LockKeyhole size={20} />
-            <span>{journal.lock ? "Remove lock" : "Add lock"}</span>
-          </button>
-          <button
-            className="menu-row"
-            onClick={() => setDialog("export-journal")}
-          >
-            <Icon name="Shell/Control Strip/share" />
-            <span>Export journal</span>
-          </button>
-          <button
-            className="menu-row danger"
-            onClick={() =>
-              setConfirm({
-                title: "Delete this journal?",
-                message:
-                  "All " +
-                  journal.pageIds.length +
-                  " pages in " +
-                  journal.title +
-                  " will be removed. This cannot be undone.",
-                action: () => {
-                  update((l) => {
-                    const pages = { ...l.pages };
-                    journal.pageIds.forEach((id) => delete pages[id]);
-                    const journals = l.journals.filter(
-                      (j) => j.id !== journal.id,
-                    );
-                    return {
-                      ...l,
-                      journals,
-                      pages,
-                      selected: Math.max(
-                        0,
-                        Math.min(l.selected, journals.length - 1),
-                      ),
-                    };
-                  });
-                  setDialog(null);
-                  notify("Journal deleted");
-                },
-              })
-            }
-          >
-            <Trash2 size={20} />
-            <span>Delete journal</span>
-          </button>
-        </Modal>
+        <JournalMenuDialog
+          journal={journal}
+          onDuplicate={() => {
+            update((l) => duplicateJournalIn(l, journal.id));
+            setDialog(null);
+            notify("Journal duplicated");
+          }}
+          onLock={() => setDialog("lock")}
+          onExport={() => setDialog("export-journal")}
+          onDelete={() =>
+            setConfirm({
+              title: "Delete this journal?",
+              message:
+                "All " +
+                journal.pageIds.length +
+                " pages in " +
+                journal.title +
+                " will be removed. This cannot be undone.",
+              action: () => {
+                update((l) => removeJournal(l, journal.id));
+                setDialog(null);
+                notify("Journal deleted");
+              },
+            })
+          }
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "page-menu" && page && (
-        <Modal title={"Page " + (index + 1)} onClose={() => setDialog(null)}>
-          <button
-            className="menu-row"
-            onClick={() => duplicatePages([page.id])}
-          >
-            <Icon name="Shell/Control Strip/duplicate" />
-            <span>Duplicate page</span>
-          </button>
-          <button className="menu-row" onClick={() => batch([page.id], "move")}>
-            <Icon name="Shell/Control Strip/move" />
-            <span>Move to another journal</span>
-          </button>
-          <button className="menu-row" onClick={() => setDialog("note")}>
-            <FileText size={20} />
-            <span>{page.note ? "Edit note" : "Add a text note"}</span>
-          </button>
-          <button
-            className="menu-row"
-            onClick={() =>
-              run(async () => {
-                const c = await composePage(page, true, lib.templates);
-                const rotated = document.createElement("canvas");
-                rotated.width = c.height;
-                rotated.height = c.width;
-                const ctx = rotated.getContext("2d")!;
-                ctx.translate(rotated.width, 0);
-                ctx.rotate(Math.PI / 2);
-                ctx.drawImage(c, 0, 0);
-                updatePage({
-                  ...page,
-                  width: rotated.width,
-                  height: rotated.height,
-                  ink: rotated.toDataURL(),
-                  fill: "",
-                  photos: [],
-                  template: "",
-                  thumbnail: "",
-                });
-                setDialog(null);
-              })
-            }
-          >
-            <Icon name="Shell/Control Strip/rotate" />
-            <span>Rotate page</span>
-          </button>
-          <button
-            className="menu-row danger"
-            onClick={() => deletePages([page.id])}
-          >
-            <Trash2 size={20} />
-            <span>Delete page</span>
-          </button>
-        </Modal>
+        <PageMenuDialog
+          page={page}
+          pageNumber={index + 1}
+          onDuplicate={() => duplicatePages([page.id])}
+          onMove={() => batch([page.id], "move")}
+          onNote={() => setDialog("note")}
+          onRotate={() => rotatePage(page)}
+          onDelete={() => deletePages([page.id])}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "move" && journal && (
-        <Modal title="Move to journal" onClose={() => setDialog(null)}>
-          {lib.journals
-            .filter((j) => j.id !== journal.id)
-            .map((j) => (
-              <button
-                key={j.id}
-                className="menu-row"
-                onClick={() => {
-                  update((l) => movePages(l, moveIds, journal.id, j.id));
-                  setIndex(0);
-                  setDialog(null);
-                  setView("grid");
-                  notify("Pages moved to " + j.title);
-                }}
-              >
-                <img className="mini-cover" src={j.cover} alt="" />
-                <span>{j.title}</span>
-              </button>
-            ))}
-        </Modal>
+        <MoveDialog
+          journals={lib.journals.filter((j) => j.id !== journal.id)}
+          onPick={(j) => {
+            update((l) => movePages(l, moveIds, journal.id, j.id));
+            setIndex(0);
+            setDialog(null);
+            setView("grid");
+            notify("Pages moved to " + j.title);
+          }}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "note" && page && (
-        <Modal title="A note for this page" onClose={() => setDialog(null)}>
-          <div className="note-tools">
-            <button
-              onClick={() => updatePage({ ...page, note: page.note + "\n• " })}
-            >
-              • List
-            </button>
-            <button
-              onClick={() => updatePage({ ...page, note: page.note + "\n☐ " })}
-            >
-              ☐ Checklist
-            </button>
-            <button
-              className="danger"
-              onClick={() => updatePage({ ...page, note: "" })}
-            >
-              Clear
-            </button>
-          </div>
-          <textarea
-            className="note-editor"
-            aria-label="Page note"
-            placeholder="Put your thoughts into words…"
-            value={page.note}
-            onChange={(e) => updatePage({ ...page, note: e.target.value })}
-          />
-          <button className="primary-button" onClick={() => setDialog(null)}>
-            Done
-          </button>
-        </Modal>
+        <NoteDialog
+          page={page}
+          onChange={updatePage}
+          onClose={() => setDialog(null)}
+        />
       )}
       {(dialog === "export-page" || dialog === "export-journal") && (
-        <Modal
-          title={
-            dialog === "export-journal"
-              ? "Share your journal"
-              : "Share your idea"
+        <ExportDialog
+          mode={dialog === "export-journal" ? "journal" : "page"}
+          busy={busy}
+          exportBackground={lib.settings.exportBackground}
+          onExportBackground={(v) =>
+            update((l) => ({
+              ...l,
+              settings: { ...l.settings, exportBackground: v },
+            }))
+          }
+          onPNG={exportPNG}
+          onPDF={() =>
+            run(async () => {
+              await exportPDF(
+                dialog === "export-page" && page
+                  ? [page]
+                  : journal!.pageIds.map((id) => lib.pages[id]),
+                journal?.title || "Tinta",
+                lib.settings.exportBackground,
+                lib.templates,
+              );
+              notify("PDF exported");
+            })
           }
           onClose={() => setDialog(null)}
-        >
-          <div className="export-options">
-            {dialog === "export-page" && (
-              <button disabled={busy} onClick={exportPNG}>
-                <ImagePlus size={28} />
-                <strong>PNG image</strong>
-                <span>A picture of this page</span>
-              </button>
-            )}
-            <button
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await exportPDF(
-                    dialog === "export-page" && page
-                      ? [page]
-                      : journal!.pageIds.map((id) => lib.pages[id]),
-                    journal?.title || "Tinta",
-                    lib.settings.exportBackground,
-                    lib.templates,
-                  );
-                  notify("PDF exported");
-                })
-              }
-            >
-              <FileText size={28} />
-              <strong>PDF document</strong>
-              <span>
-                {dialog === "export-page"
-                  ? "This page"
-                  : "Every idea, in order"}
-              </span>
-            </button>
-          </div>
-          <Toggle
-            label="Include background color"
-            value={lib.settings.exportBackground}
-            onChange={(v) =>
-              update((l) => ({
-                ...l,
-                settings: { ...l.settings, exportBackground: v },
-              }))
-            }
-          />
-          {busy && <p className="muted">Preparing your export…</p>}
-        </Modal>
+        />
       )}
       {(dialog === "lock" || dialog === "unlock") && journal && (
-        <Modal
-          title={
-            dialog === "unlock"
-              ? "This journal is private"
-              : journal.lock
-                ? "Remove journal lock"
-                : "A little more privacy"
+        <PinDialog
+          mode={dialog}
+          locked={!!journal.lock}
+          onSubmit={(pin, fail) =>
+            run(async () => {
+              if (journal.lock) {
+                if (
+                  (await pinHash(pin, journal.lock.salt)) !== journal.lock.hash
+                ) {
+                  fail("That code does not match. Try again.");
+                  return;
+                }
+                if (dialog === "unlock") {
+                  unlocked.current.add(journal.id);
+                  setDialog(null);
+                  afterUnlock.current?.();
+                  afterUnlock.current = null;
+                  return;
+                } else changeJournal((j) => ({ ...j, lock: undefined }));
+              } else {
+                const salt = uid(),
+                  hash = await pinHash(pin, salt);
+                changeJournal((j) => ({ ...j, lock: { salt, hash } }));
+                unlocked.current.delete(journal.id);
+              }
+              setDialog(null);
+            })
           }
           onClose={() => setDialog(null)}
-        >
-          <p className="muted">
-            {dialog === "unlock" || journal.lock
-              ? "Enter your four-digit code."
-              : "Choose a four-digit code to hide this journal on a shared device. This locks the app view; it does not encrypt a backup."}
-          </p>
-          <input
-            className="pin-input"
-            aria-label="Journal PIN"
-            inputMode="numeric"
-            type="password"
-            maxLength={4}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-          />
-          {pinError && <p className="danger">{pinError}</p>}
-          <button
-            className="primary-button"
-            disabled={pin.length !== 4}
-            onClick={() =>
-              run(async () => {
-                if (journal.lock) {
-                  if (
-                    (await pinHash(pin, journal.lock.salt)) !==
-                    journal.lock.hash
-                  ) {
-                    setPinError("That code does not match. Try again.");
-                    return;
-                  }
-                  if (dialog === "unlock") {
-                    unlocked.current.add(journal.id);
-                    setDialog(null);
-                    afterUnlock.current?.();
-                    afterUnlock.current = null;
-                    return;
-                  } else changeJournal((j) => ({ ...j, lock: undefined }));
-                } else {
-                  const salt = uid(),
-                    hash = await pinHash(pin, salt);
-                  changeJournal((j) => ({ ...j, lock: { salt, hash } }));
-                  unlocked.current.delete(journal.id);
-                }
-                setDialog(null);
-              })
-            }
-          >
-            {dialog === "unlock"
-              ? "Open journal"
-              : journal.lock
-                ? "Remove lock"
-                : "Set code"}
-          </button>
-        </Modal>
+        />
       )}
-      {dialog === "help" && (
-        <Modal title="Think with your hands" onClose={() => setDialog(null)}>
-          <div className="help-list">
-            <p>
-              <strong>Make a mark.</strong> Pick a tool in the tray. Tap the
-              selected tool to change its size. Use a Pencil, your finger, or a
-              mouse.
-            </p>
-            <p>
-              <strong>Find your way.</strong> Tap a journal, then a page. Pinch
-              to zoom. Swipe from the canvas edges to turn a page.
-            </p>
-            <p>
-              <strong>Try again.</strong> Undo with the arrow, a two-finger
-              double tap, or ⌘Z. Shift-⌘Z brings it back.
-            </p>
-            <p>
-              <strong>Move things around.</strong> Draw around ink with Cut.
-              Move, resize, rotate, duplicate, or keep the selection as a clip.
-            </p>
-            <p>
-              <strong>Add some color.</strong> Tap a swatch twice to edit it.
-              Drag a swatch onto the page to change its background.
-            </p>
-            <p>
-              <strong>Keep your ideas.</strong> Your work saves on this device.
-              Export a backup from Settings to take your journals with you.
-            </p>
-          </div>
-          <p className="settings-footnote">
-            Tinta · Reference version 5.5.10
-            <br />
-            Build{" "}
-            {document
-              .querySelector('meta[name="paper-build"]')
-              ?.getAttribute("content") || "dev"}
-            <br />
-            Native cloud and subscription services are not connected.
-          </p>
-        </Modal>
-      )}
+      {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {confirm && (
-        <Modal title={confirm.title} onClose={() => setConfirm(null)}>
-          <p>{confirm.message}</p>
-          <div className="dialog-actions">
-            <button
-              className="secondary-button"
-              onClick={() => setConfirm(null)}
-            >
-              Cancel
-            </button>
-            <button
-              className="primary-button danger-button"
-              onClick={() => {
-                confirm.action();
-                setConfirm(null);
-              }}
-            >
-              Confirm
-            </button>
-          </div>
-        </Modal>
+        <ConfirmDialog
+          title={confirm.title}
+          message={confirm.message}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => {
+            confirm.action();
+            setConfirm(null);
+          }}
+        />
       )}
       {error && !fatal && (
         <div className="error-banner" role="alert">

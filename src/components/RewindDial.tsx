@@ -91,7 +91,7 @@ export default function RewindDial({
             style={{ transform: `rotate(${index * 22.5}deg)` }}
           />
           <span className="rewind-center">
-            <Icon name="Canvas/Shell/rewind-gesture-undo" />
+            <Icon name="canvas-shell-rewind-gesture-undo" />
             <span>
               {index} / {total - 1}
             </span>
@@ -100,14 +100,14 @@ export default function RewindDial({
         <div className="rewind-actions">
           <IconButton
             label="Rewind backward"
-            name="Canvas/Shell/undo"
+            name="canvas-shell-undo"
             disabled={index === 0}
             onClick={() => onSeek(index - 1)}
           />
           <button onClick={onClose}>Done</button>
           <IconButton
             label="Rewind forward"
-            name="Canvas/Shell/redo"
+            name="canvas-shell-redo"
             disabled={index === total - 1}
             onClick={() => onSeek(index + 1)}
           />
