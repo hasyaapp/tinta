@@ -5,7 +5,8 @@
   --closed-height: min(50dvh, 118vw);
   --closed-width: calc(var(--closed-height) * 0.6783);
   --shelf-step: calc(var(--closed-width) * 1.08);
-  --spread-width: min(67.85dvh, 75vw);
+  /* Reference spread: 57.4% of the viewport height, fan spanning ~85% width. */
+  --spread-width: min(57.4dvh, 64vw);
   --spread-height: calc(var(--spread-width) * 0.813);
   --leaf-perspective: calc(var(--spread-width) * 1.54286);
   --book-center: 51.25%;
@@ -569,7 +570,7 @@
   .paper-app {
     --shelf-center: 52%;
     --closed-height: min(47dvh, 110vw);
-    --spread-width: 79vw;
+    --spread-width: 70vw;
     --book-radius: 22px;
   }
   .journal-heading,
@@ -713,11 +714,11 @@
 .butterfly-stack:before {
   content: "";
   position: absolute;
-  left: calc(50% - var(--spread-width) * (0.15 + var(--fan-left) * 0.065));
+  left: calc(50% - var(--spread-width) * (0.15 + var(--fan-left) * 0.082));
   top: calc(var(--book-center) + var(--spread-height) * 0.3);
   width: calc(
     var(--spread-width) *
-      (0.72 + var(--fan-right) * 0.065 + var(--fan-left) * 0.065)
+      (0.72 + var(--fan-right) * 0.082 + var(--fan-left) * 0.082)
   );
   height: calc(var(--spread-height) * 0.64);
   background: #1c2445;

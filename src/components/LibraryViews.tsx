@@ -12,6 +12,18 @@ import {
   TurningPage,
 } from "./JournalBook";
 import { bookMotion } from "../engine/book/motion";
+/** Cards fanned on each side of the open spread, as in the reference. */
+const FAN_DEPTH = 7;
+/** Placement of the card `d` steps from the open spread. Measured from the
+ *  reference: each card protrudes 0.144, 0.223, 0.291… spread-widths past the
+ *  spread's edge and shrinks ~4.5% per step. */
+function fanPlacement(d: number) {
+  if (d === 0) return { shift: 0, scale: 1 };
+  const n = Math.abs(d);
+  const scale = Math.max(0.64, 0.97 - 0.045 * n);
+  const protrude = 0.07 + 0.072 * n - 0.0012 * n * n;
+  return { shift: Math.sign(d) * (protrude + (1 - scale) / 2), scale };
+}
 export function Home({
   library,
   shelfState,
@@ -334,8 +346,11 @@ export function Pages({
           className="butterfly-stack"
           style={
             {
-              "--fan-right": Math.min(6, journal.pageIds.length - 1 - index),
-              "--fan-left": Math.min(6, index),
+              "--fan-right": Math.min(
+                FAN_DEPTH,
+                journal.pageIds.length - 1 - index,
+              ),
+              "--fan-left": Math.min(FAN_DEPTH, index),
             } as CSSProperties
           }
           onWheel={(e) => {
@@ -377,7 +392,8 @@ export function Pages({
         >
           {journal.pageIds.map((id, i) => {
             const d = i - index;
-            if (Math.abs(d) > 6) return null;
+            if (Math.abs(d) > FAN_DEPTH) return null;
+            const fan = fanPlacement(d);
             return (
               <button
                 key={id}
@@ -386,13 +402,8 @@ export function Pages({
                   {
                     "--offset": d,
                     "--abs": Math.abs(d),
-                    "--fan-shift":
-                      d === 0
-                        ? 0
-                        : (Math.sign(d) * (61 * Math.abs(d) + 59 - d * d)) /
-                          700,
-                    "--fan-scale":
-                      d === 0 ? 1 : Math.max(0.67, 0.95 - 0.04 * Math.abs(d)),
+                    "--fan-shift": fan.shift,
+                    "--fan-scale": fan.scale,
                     zIndex: 10 - Math.abs(d),
                   } as CSSProperties
                 }

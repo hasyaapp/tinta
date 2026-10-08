@@ -24,6 +24,8 @@ const TURN_BEND = 9 * DEG;
 const COVER_BEND = 4 * DEG;
 /** Cardstock corner radius; must match --leaf-radius in book.css. */
 const LEAF_RADIUS = 18;
+/** Visible cardstock thickness while a card turns, matching the CSS leaf edge. */
+const LEAF_EDGE = 4;
 /** The book-unfold keyframes put their waypoint at 42%. */
 const COVER_WAYPOINT = 0.42;
 
@@ -93,6 +95,7 @@ uniform float uFaceSign;
 uniform vec2 uSize;
 uniform float uRadius;
 uniform float uFold;
+uniform float uEdge;    // laminated cardstock rim width (px); 0 = none
 varying vec2 vUv;
 varying vec3 vWorld;
 ${BAND_GLSL}
@@ -115,6 +118,15 @@ void main() {
   } else {
     vec2 uv = vec2(mix(uBackU.x, uBackU.y, vUv.x), vUv.y);
     base = mix(uPaper, texture2D(uBackTex, uv).rgb, uHasBack);
+  }
+  // Cardstock rim, the same three tones as the CSS leaf edge. The spine side
+  // sits uRadius inside the SDF, so only the free edges get the rim.
+  if (uEdge > 0.0 && dist > -uEdge) {
+    float t = (dist + uEdge) / uEdge;
+    vec3 rim = t < 0.34 ? vec3(0.902, 0.886, 0.851)
+             : t < 0.67 ? vec3(0.831, 0.804, 0.753)
+             : vec3(0.706, 0.675, 0.616);
+    base = rim;
   }
   // Wrap lighting from the deformed surface, normalised so a sheet facing the
   // reader keeps its authored colours and only the curl changes the tone.
@@ -186,6 +198,7 @@ class Sheet {
       uFaceSign: { value: -1 },
       uRadius: { value: LEAF_RADIUS },
       uFold: { value: 0 },
+      uEdge: { value: 0 },
     };
     this.material = new THREE.ShaderMaterial({
       vertexShader: SHEET_VERT,
@@ -334,6 +347,7 @@ export class BookMotionEngine {
     sheet.u.uMirror.value = mirror;
     sheet.u.uFaceSign.value = -mirror;
     sheet.u.uRadius.value = LEAF_RADIUS;
+    sheet.u.uEdge.value = LEAF_EDGE;
     sheet.u.uBandWidth.value = 0;
     (sheet.u.uPaper.value as THREE.Color).set("#f8f7f2");
     // Forward shows the right half of the outgoing page and lands on the left
