@@ -1,0 +1,44 @@
+{
+  "name": "tinta",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/dev.mjs",
+    "build": "node tools/copy-ocr-assets.mjs && node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",
+    "preview": "node node_modules/vite/bin/vite.js preview --host 0.0.0.0",
+    "test": "node node_modules/vitest/vitest.mjs run",
+    "test:e2e": "node node_modules/@playwright/test/cli.js test",
+    "test:offline": "node node_modules/@playwright/test/cli.js test --config playwright.offline.config.ts",
+    "format": "node node_modules/prettier/bin/prettier.cjs --write src tests tools/*.ts *.ts *.json",
+    "test:webkit": "SCREENSHOT_OUT=artifacts/webkit node node_modules/@playwright/test/cli.js test --config playwright.webkit.config.ts"
+  },
+  "dependencies": {
+    "idb": "8.0.3",
+    "lucide-react": "1.45.0",
+    "pdf-lib": "1.17.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tesseract.js": "7.0.0",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "@fontsource/fraunces": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@playwright/test": "1.63.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@types/node": "22.20.2",
+    "@types/pngjs": "6.0.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "pixelmatch": "7.2.0",
+    "pngjs": "7.0.0",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "vitest": "4.1.11"
+  }
+}

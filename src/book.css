@@ -1,0 +1,714 @@
+/* Geometry measured against the supplied 1440x1080 clips, normalized to the
+   1376x1032 review viewport. These are visual estimates, not a native trace. */
+.paper-app {
+  --shelf-center: 54.5%;
+  --closed-height: min(50dvh, 118vw);
+  --closed-width: calc(var(--closed-height) * 0.6783);
+  --shelf-step: calc(var(--closed-width) * 1.08);
+  --spread-width: min(67.85dvh, 75vw);
+  --spread-height: calc(var(--spread-width) * 0.813);
+  --leaf-perspective: calc(var(--spread-width) * 1.54286);
+  --book-center: 51.25%;
+  --book-radius: calc(var(--closed-width) * 0.08);
+}
+.paper-app:after {
+  opacity: 0;
+}
+.home-scene,
+.pages-scene {
+  animation: none;
+}
+.paper-app.view-home {
+  background: linear-gradient(160deg, #78768d, #807e9e);
+}
+.paper-app.view-butterfly {
+  background: linear-gradient(150deg, #373f60, #3b435f);
+}
+.paper-app.view-butterfly:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #5157721a;
+  clip-path: polygon(0 17%, 39% 0, 100% 24%, 100% 0, 0 0);
+  pointer-events: none;
+}
+.bookshelf {
+  perspective: 1600px;
+  perspective-origin: 50% var(--shelf-center);
+}
+.paper-app:not(.is-customizing) .book-position {
+  width: var(--closed-width);
+  height: var(--closed-height);
+  top: var(--shelf-center);
+  transform: translate3d(
+      calc(-50% + var(--offset) * var(--shelf-step)),
+      calc(-50% - var(--closed-height) * 0.0155),
+      0
+    )
+    rotateX(15deg) scale(0.9, 0.88);
+  opacity: clamp(0, calc(1 - max(0, var(--abs) - 3)), 1);
+  transition:
+    transform 520ms cubic-bezier(0.22, 0.72, 0.25, 1),
+    opacity 350ms;
+}
+/* The shelf books are tilted, but the lifted book is not: reference frames show
+   the selected cover as a rectangle (constant width top to bottom) while its
+   neighbours widen towards the bottom by about 6%. */
+.paper-app:not(.is-customizing) .book-position.selected {
+  transform: translate3d(-50%, calc(-50% - var(--closed-height) * 0.065), 0);
+}
+.book-position .book,
+.book-position.selected .book,
+.book-position:hover .book {
+  transform: none;
+  transform-style: preserve-3d;
+}
+/* 3D shelf. The canvas only paints: the buttons keep their layout, their
+   accessible names and their measured rectangles, so they stay the hit targets. */
+.shelf-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+}
+.shelf-canvas[data-active] {
+  display: block;
+}
+/* With the canvas painting the books, the CSS drawing of the closed book steps
+   aside. Without `render-3d` nothing changes and CSS remains the fallback. */
+.book-position[data-shelf-painted] .book,
+.book-position[data-shelf-painted] .book-shadow {
+  visibility: hidden;
+}
+.book-position[data-shelf-painted] .book-lock {
+  visibility: visible;
+}
+/* Uniform hardcover construction shared by every book in the series: a rounded
+   spine board with a lit outer edge and a groove where it meets the cover, and a
+   paper stack along the fore-edge. Proportions follow the reference cross-section
+   (bright edge, dark groove, band face, dark seam) and its bottom edge. */
+.book-band {
+  width: 12%;
+  opacity: 1;
+  border-radius: 4px 0 0 4px;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.5) 10%,
+    rgba(0, 0, 0, 0.36) 27%,
+    rgba(255, 255, 255, 0.2) 42%,
+    rgba(0, 0, 0, 0) 66%,
+    rgba(0, 0, 0, 0.34) 100%
+  );
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.34);
+}
+.book-spine {
+  width: 4%;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.22),
+    rgba(255, 255, 255, 0.14) 22%,
+    rgba(0, 0, 0, 0.1) 45%,
+    transparent 65%
+  );
+}
+.book-cover {
+  border-radius: 1px var(--book-radius) var(--book-radius) 1px;
+  box-shadow:
+    inset -1px 0 1px rgba(0, 0, 0, 0.16),
+    0 1px 0 rgba(0, 0, 0, 0.14);
+}
+.book-cover:after {
+  background: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0) 18%,
+    rgba(0, 0, 0, 0.08) 97%
+  );
+}
+/* Fore-edge only. The reference books show the paper stack as a light sliver with
+   a thin dark rim; a band-coloured outline is not present in any frame. */
+.book-pages {
+  inset: 4px 3px -11px 5px;
+  border-radius: 2px var(--book-radius) var(--book-radius) 2px;
+  background: repeating-linear-gradient(
+    0deg,
+    #8a897f 0 1px,
+    #a6a49a 1px 2px,
+    #6f6e66 2px 3px
+  );
+  box-shadow:
+    inset -1px 0 0 rgba(60, 63, 58, 0.34),
+    inset 0 -2px 0 rgba(45, 48, 42, 0.5),
+    0 4px 4px rgba(32, 34, 59, 0.2);
+}
+/* The lifted book is seen straight on, so its fore-edge is hidden behind the
+   cover; letting it protrude draws a line the reference does not have. */
+.book-position.selected .book-pages {
+  bottom: 0;
+}
+.home-actions,
+.pages-actions:not(.fixed) {
+  top: 87.1%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  gap: 9px;
+}
+.home-actions .icon-button,
+.pages-actions:not(.fixed) .icon-button {
+  width: 39px;
+  height: 39px;
+  background: #faf9f8;
+  box-shadow: 0 3px 5px #24294330;
+}
+.home-actions .native-icon,
+.pages-actions:not(.fixed) .native-icon {
+  width: 27px;
+  height: 27px;
+  filter: brightness(0) opacity(0.76);
+}
+/* The icon's disc fills 75% of its canvas, so the button is sized to land the disc
+   on the 27-28 px of the reference at the review viewport and to scale with the
+   book elsewhere. The disc sits 12 px in from the cover's top and right edges. */
+.paper-app:not(.is-customizing) .cover-customize-button {
+  --customize-size: calc(var(--closed-width) * 0.106);
+  left: calc(
+    50% + var(--closed-width) / 2 - var(--customize-size) * 0.875 - 12px
+  );
+  top: calc(
+    var(--shelf-center) - var(--closed-height) * 0.565 + 12px -
+      var(--customize-size) * 0.125
+  );
+  width: var(--customize-size);
+  height: var(--customize-size);
+}
+.journal-heading,
+.pages-scene .journal-heading {
+  top: 10.5%;
+}
+.journal-heading p {
+  font-size: 11px;
+  margin-top: 12px;
+}
+.journal-heading .tiny-pages {
+  font-size: 17px;
+}
+.shelf-arrow {
+  display: none;
+}
+/* Arrow keys and swipe remain primary; mouse users can reveal edge controls. */
+@media (hover: hover) {
+  .shelf-arrow {
+    display: flex;
+  }
+  .home-scene:hover .shelf-arrow,
+  .pages-scene:hover .shelf-arrow {
+    opacity: 0;
+  }
+  .shelf-arrow:hover,
+  .shelf-arrow:focus-visible {
+    opacity: 1 !important;
+  }
+}
+
+/* Full drawing split on the gutter. The far sides lift towards the viewer,
+   creating the observed shallow V at the top and bottom of the open sheet. */
+.butterfly-stack {
+  perspective: none;
+}
+.butterfly-stack .spread-page,
+.butterfly-stack .spread-page.current {
+  top: var(--book-center);
+  width: var(--spread-width);
+  height: var(--spread-height);
+  aspect-ratio: auto;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+  transform: translate(
+      calc(-50% + var(--fan-shift) * var(--spread-width)),
+      -50%
+    )
+    scale(var(--fan-scale));
+  transition: transform 540ms cubic-bezier(0.22, 0.72, 0.25, 1);
+}
+.folded-spread {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  perspective: var(--leaf-perspective);
+  transform-style: preserve-3d;
+}
+.spread-leaf,
+.spread-binding {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  backface-visibility: hidden;
+}
+.spread-leaf {
+  overflow: hidden;
+  background: #efedea;
+  box-shadow: 0 0 1px #8885;
+}
+.leaf-left,
+.binding-left {
+  left: 0;
+  transform-origin: 100% 50%;
+  transform: rotateY(14deg);
+  border-radius: 30px 0 0 30px;
+}
+.leaf-right,
+.binding-right {
+  right: 0;
+  transform-origin: 0 50%;
+  transform: rotateY(-14deg);
+  border-radius: 0 30px 30px 0;
+}
+.spread-binding {
+  background: var(--binding);
+  width: calc(50% + 5px);
+  top: 2px;
+  bottom: -3px;
+}
+.binding-left {
+  left: -5px;
+}
+.binding-right {
+  right: -5px;
+}
+.leaf-content {
+  position: absolute;
+  inset: 0;
+  width: 200%;
+  height: 100%;
+  pointer-events: none;
+}
+.leaf-content-right {
+  left: -100%;
+}
+.leaf-content .page-preview {
+  aspect-ratio: auto !important;
+  border-radius: 0;
+}
+.spread-leaf:after,
+.turn-face:after,
+.opening-lining:after,
+.opening-inside:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, #5c5a5a15, transparent 70%);
+}
+.butterfly-scene .spread-count {
+  top: calc(var(--book-center) + var(--spread-height) * 0.555);
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.butterfly-scene:focus-within .spread-count {
+  opacity: 0.6;
+}
+.butterfly-scene .delete-page-pill {
+  top: calc(87.1% - 61px);
+  bottom: auto;
+}
+/* Native artwork actions: note editing remains available through Page options. */
+.butterfly-scene .pages-actions [aria-label="Add text note"] {
+  display: none;
+}
+
+.page-turn-scene {
+  position: absolute;
+  left: 50%;
+  top: var(--book-center);
+  width: var(--spread-width);
+  height: var(--spread-height);
+  transform: translate(-50%, -50%);
+  perspective: var(--leaf-perspective);
+  z-index: 25;
+  pointer-events: none;
+}
+.turn-leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  transform-style: preserve-3d;
+  animation: leaf-forward var(--turn-duration) cubic-bezier(0.35, 0.08, 0.3, 1)
+    both;
+}
+.forward .turn-leaf {
+  left: 50%;
+  transform-origin: 0 50%;
+}
+.backward .turn-leaf {
+  left: 0;
+  transform-origin: 100% 50%;
+  animation-name: leaf-backward;
+}
+.turn-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #f8f7f2;
+  backface-visibility: hidden;
+  transform: none;
+}
+/* Only the face turned towards the reader casts onto the pages below; the back
+   face would otherwise drop its shadow off the book once the sheet has landed. */
+.turn-front {
+  box-shadow: 5px 4px 9px #232a4b26;
+}
+/* The faces carry .leaf-left/.leaf-right for their rounded outer corners, which
+   also set transform-origin to the gutter edge. The back face must turn about its
+   own centre or it swings out of the sheet plane. */
+.turn-back {
+  transform: rotateY(180deg);
+  transform-origin: 50% 50%;
+}
+.turn-front:after {
+  animation: leaf-light var(--turn-duration) linear both;
+}
+/* The sheet covers this leaf as it lands, so it must stay visible for the whole
+   turn. Sending it behind by 1px avoids z-fighting at the final coplanar frame. */
+.forward .turn-stationary {
+  transform: rotateY(14deg) translateZ(-1px);
+}
+.backward .turn-stationary {
+  transform: rotateY(-14deg) translateZ(-1px);
+}
+@keyframes leaf-forward {
+  from {
+    transform: rotateY(-14deg);
+  }
+  to {
+    transform: rotateY(-166deg);
+  }
+}
+@keyframes leaf-backward {
+  from {
+    transform: rotateY(14deg);
+  }
+  to {
+    transform: rotateY(166deg);
+  }
+}
+@keyframes leaf-light {
+  0%,
+  100% {
+    background-color: #1110;
+  }
+  24% {
+    background-color: #34353c22;
+  }
+  52% {
+    background-color: #34353c40;
+  }
+  78% {
+    background-color: #34353c22;
+  }
+}
+
+/* Shared rest geometry prevents a jump at either end of open/close. */
+.cover-flip {
+  position: absolute;
+  z-index: 22;
+  pointer-events: none;
+  inset: 0;
+  width: auto;
+  height: auto;
+  transform: none;
+  perspective: var(--leaf-perspective);
+  perspective-origin: 50% var(--book-center);
+}
+.opening-book {
+  position: absolute;
+  transform-style: preserve-3d;
+  animation: book-unfold var(--cover-duration) cubic-bezier(0.3, 0.05, 0.25, 1)
+    both;
+}
+.opening-front,
+.opening-back {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  transform-style: preserve-3d;
+}
+.opening-front {
+  animation: board-unfold var(--cover-duration) cubic-bezier(0.3, 0.05, 0.25, 1)
+    both;
+}
+.opening-back {
+  animation: back-unfold var(--cover-duration) cubic-bezier(0.3, 0.05, 0.25, 1)
+    both;
+}
+.opening-cover,
+.opening-lining,
+.opening-inside {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  overflow: hidden;
+  border-radius: 1px var(--book-radius) var(--book-radius) 1px;
+  background: #efedea;
+}
+.opening-cover {
+  transform: translateZ(2px);
+}
+.opening-lining {
+  transform: rotateY(180deg) translateZ(0.5px);
+  border-radius: 30px 0 0 30px;
+}
+.opening-inside {
+  border-radius: 0 30px 30px 0;
+}
+.opening-page-block {
+  position: absolute;
+  inset: -2px -5px -4px 0;
+  background: var(--binding);
+  border-radius: 0 30px 30px 0;
+  transform: translateZ(-2px);
+}
+.opening-front .book-cover {
+  width: 100%;
+  height: 100%;
+}
+.cover-flip.close .opening-book,
+.cover-flip.close .opening-front,
+.cover-flip.close .opening-back {
+  animation-direction: reverse;
+}
+@keyframes book-unfold {
+  0% {
+    left: calc(50% - var(--closed-width) / 2);
+    top: calc(var(--shelf-center) - var(--closed-height) * 0.565);
+    width: var(--closed-width);
+    height: var(--closed-height);
+  }
+  42% {
+    left: 50%;
+    top: calc(var(--book-center) - var(--spread-height) / 2);
+    width: calc(var(--spread-width) / 2);
+    height: var(--spread-height);
+  }
+  100% {
+    left: 50%;
+    top: calc(var(--book-center) - var(--spread-height) / 2);
+    width: calc(var(--spread-width) / 2);
+    height: var(--spread-height);
+  }
+}
+@keyframes board-unfold {
+  0% {
+    transform: rotateY(0deg);
+  }
+  42% {
+    transform: rotateY(-86deg);
+  }
+  100% {
+    transform: rotateY(-166deg);
+  }
+}
+@keyframes back-unfold {
+  0% {
+    transform: rotateY(0deg);
+  }
+  42% {
+    transform: rotateY(-80deg);
+  }
+  100% {
+    transform: rotateY(-14deg);
+  }
+}
+.is-book-transition .book-position.selected,
+.is-book-transition .cover-customize-button,
+.is-book-transition .butterfly-stack {
+  visibility: hidden;
+}
+.is-book-transition .book-position:not(.selected) {
+  opacity: 0;
+}
+.is-book-transition .delete-page-pill,
+.is-book-transition .spread-count {
+  visibility: hidden;
+}
+.is-customizing .book {
+  --book-radius: 24px;
+}
+@media (max-width: 600px) {
+  .paper-app {
+    --shelf-center: 52%;
+    --closed-height: min(47dvh, 110vw);
+    --spread-width: 79vw;
+    --book-radius: 22px;
+  }
+  .journal-heading,
+  .pages-scene .journal-heading {
+    top: 14%;
+  }
+  .paper-app:not(.is-customizing) .book-position {
+    top: 52%;
+  }
+  .home-actions,
+  .pages-actions:not(.fixed) {
+    top: 84%;
+  }
+  .paper-app:not(.is-customizing) .cover-customize-button {
+    top: calc(
+      52% - var(--closed-height) * 0.565 + 12px - var(--customize-size) * 0.125
+    );
+  }
+  .spread-leaf,
+  .spread-binding,
+  .turn-face,
+  .opening-lining,
+  .opening-inside {
+    border-radius: 12px;
+  }
+  .leaf-left,
+  .binding-left {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .leaf-right,
+  .binding-right {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-position,
+  .butterfly-stack .spread-page {
+    transition: none !important;
+  }
+  .page-turn-scene {
+    display: none;
+  }
+}
+/* Shadows belong beneath the complete book, not inside the 3D leaf scene. */
+.book {
+  z-index: 0;
+}
+.spread-binding {
+  top: 1px;
+  bottom: -1px;
+}
+.app-header {
+  padding: 0 14px;
+}
+.app-header .native-icon {
+  width: 40px;
+  height: 40px;
+}
+.app-header .icon-button {
+  width: 40px;
+  height: 40px;
+}
+.app-header .icon-button.active {
+  background: none;
+  box-shadow: none;
+}
+.app-header .header-left,
+.app-header .header-right {
+  gap: 8px;
+}
+.view-butterfly .app-header [aria-label="Butterfly view"] {
+  display: none;
+}
+.view-home .save-state:not(.failed),
+.view-butterfly .save-state:not(.failed) {
+  display: none;
+}
+.home-actions .icon-button .native-icon,
+.pages-actions:not(.fixed) .icon-button .native-icon {
+  width: 36px;
+  height: 36px;
+  filter: brightness(0) opacity(0.75);
+}
+.is-book-transition:not(.is-customizing) .book-position:not(.selected) {
+  transform: translate3d(
+      calc(-50% + var(--offset) * var(--shelf-step) * 1.9),
+      calc(-50% - var(--closed-height) * 0.0155),
+      0
+    )
+    rotateX(15deg) scale(0.9, 0.88);
+  opacity: 0;
+}
+.paper-app.is-book-transition:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  clip-path: none;
+  animation: book-background 560ms ease both;
+}
+.paper-app.transition-open:before {
+  background: linear-gradient(150deg, #373f60, #3b435f);
+}
+.paper-app.transition-close:before {
+  background: linear-gradient(160deg, #78768d, #807e9e);
+}
+@keyframes book-background {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.book-shadow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 55%,
+    rgba(20, 24, 48, 0.42),
+    rgba(20, 24, 48, 0.18) 62%,
+    rgba(20, 24, 48, 0) 78%
+  );
+  transform: translate(10px, 17px);
+  filter: blur(3px);
+}
+.selected .book-shadow {
+  inset: 3px 3%;
+  background: #30396966;
+  transform: translate(33px, 71px);
+  filter: blur(7px);
+  border-radius: 4px;
+}
+.butterfly-stack:before {
+  content: "";
+  position: absolute;
+  left: calc(50% - var(--spread-width) * (0.15 + var(--fan-left) * 0.065));
+  top: calc(var(--book-center) + var(--spread-height) * 0.3);
+  width: calc(
+    var(--spread-width) *
+      (0.72 + var(--fan-right) * 0.065 + var(--fan-left) * 0.065)
+  );
+  height: calc(var(--spread-height) * 0.64);
+  background: #222b4b;
+  opacity: 0.38;
+  transform: skewX(-3deg);
+  filter: blur(5px);
+  pointer-events: none;
+}
+.leaf-left:after {
+  background: linear-gradient(100deg, #332d3413, #332d3411 80%, #332d3416);
+}
+.leaf-right:after {
+  background: linear-gradient(100deg, #332d340c, #332d3408 75%, #ffffff06);
+}
+
+.page-crumple.peel {
+  width: var(--closed-width);
+  height: var(--closed-height);
+  top: calc(var(--shelf-center) - var(--closed-height) * 0.065);
+}
